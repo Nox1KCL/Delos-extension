@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <title>Delos Offscreen</title>
+</head>
+<body>
+  <!--
+    Offscreen document — Task 2/3 stub.
+
+    This page is the only place in MV3 where Web Audio API is available.
+    It will host:
+      - AudioContext for loopback (so the user still hears the video)
+      - AudioWorkletNode for resampling to 16 kHz mono PCM
+      - Silero VAD (WASM) for voice activity detection
+      - Binary PCM chunks sent to content script via chrome.runtime.sendMessage
+
+    Implementation arrives in Task 2 (tab capture) and Task 3 (audio pipeline + VAD).
+  -->
+  <script type="module" src="index.ts"></script>
+</body>
+</html>

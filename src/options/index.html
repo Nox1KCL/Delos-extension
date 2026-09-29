@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Delos — Налаштування</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f12;
+      color: #e8e8f0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 40px 16px 60px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .header { display: flex; flex-direction: column; gap: 4px; }
+    .logo { font-size: 24px; font-weight: 700; letter-spacing: 0.08em; color: #a78bfa; }
+    .subtitle { font-size: 13px; color: #6b6b80; }
+
+    .card {
+      background: #15151d;
+      border: 1px solid #1e1e2a;
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .card-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #6b6b80;
+    }
+
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .label { font-size: 13px; font-weight: 500; color: #c4c4d4; }
+    .hint { font-size: 11px; color: #4e4e62; }
+
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+    input[type="password"],
+    input[type="text"],
+    select {
+      width: 100%;
+      background: #0f0f12;
+      border: 1px solid #2a2a3a;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 13px;
+      color: #e8e8f0;
+      outline: none;
+      transition: border-color 0.15s;
+      appearance: none;
+    }
+    input[type="password"]:focus,
+    input[type="text"]:focus,
+    select:focus { border-color: #7c3aed; }
+    input[type="password"]::placeholder,
+    input[type="text"]::placeholder { color: #4e4e62; }
+    select option { background: #15151d; }
+
+    .key-wrapper { position: relative; }
+    .key-wrapper input { padding-right: 40px; }
+    .show-key-btn {
+      position: absolute; right: 10px; top: 50%;
+      transform: translateY(-50%);
+      background: none; border: none; cursor: pointer;
+      color: #4e4e62; display: flex; align-items: center;
+      transition: color 0.15s;
+    }
+    .show-key-btn:hover { color: #a78bfa; }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: #7c3aed;
+      cursor: pointer;
+    }
+    .range-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .range-row input[type="range"] { flex: 1; }
+    .range-val {
+      font-size: 12px;
+      color: #a78bfa;
+      font-weight: 600;
+      min-width: 36px;
+      text-align: right;
+    }
+
+    input[type="color"] {
+      width: 100%;
+      height: 40px;
+      background: #0f0f12;
+      border: 1px solid #2a2a3a;
+      border-radius: 8px;
+      cursor: pointer;
+      padding: 4px 6px;
+    }
+    input[type="color"]:focus { border-color: #7c3aed; outline: none; }
+
+    .seg-group {
+      display: flex;
+      background: #0f0f12;
+      border: 1px solid #2a2a3a;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .seg-group label {
+      flex: 1;
+      text-align: center;
+      padding: 9px 4px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #6b6b80;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .seg-group input[type="radio"] { display: none; }
+    .seg-group input[type="radio"]:checked + label {
+      background: #7c3aed;
+      color: #fff;
+    }
+
+    .save-btn {
+      width: 100%;
+      padding: 11px;
+      background: #7c3aed;
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .save-btn:hover { background: #6d28d9; }
+    .save-btn:active { background: #5b21b6; }
+
+    .toast {
+      position: fixed;
+      bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #22c55e;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 10px 20px;
+      border-radius: 8px;
+      opacity: 0;
+      transition: transform 0.25s, opacity 0.25s;
+      pointer-events: none;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+    /* ── Live Preview ── */
+    .preview-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #000;
+    }
+    .preview-scene {
+      width: 100%; height: 100%;
+      background: linear-gradient(160deg, #0d1b2a 0%, #1a0a2e 40%, #0a1628 70%, #0d1b2a 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .preview-icon {
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.15);
+      display: flex; align-items: center; justify-content: center;
+      color: rgba(255,255,255,0.2);
+    }
+    .preview-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      display: flex;
+      padding: 5%;
+    }
+    .preview-subtitle-wrap {
+      position: absolute;
+      left: 0; right: 0;
+      display: flex;
+    }
+    #previewText {
+      display: inline-block;
+      border-radius: 4px;
+      padding: 4px 10px;
+      line-height: 1.4;
+      max-width: 90%;
+      transition: all 0.15s;
+    }
+    .preview-label {
+      font-size: 11px;
+      color: #4e4e62;
+      text-align: center;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">DELOS</div>
+      <div class="subtitle">Налаштування розширення</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Deepgram API</div>
+      <div class="field">
+        <label class="label" for="apiKey">API ключ</label>
+        <div class="key-wrapper">
+          <input type="password" id="apiKey" placeholder="dg_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" />
+          <button class="show-key-btn" id="showKeyBtn" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+        <span class="hint">Отримай ключ на <a href="https://console.deepgram.com" target="_blank" style="color:#a78bfa;text-decoration:none;">console.deepgram.com</a></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Субтитри</div>
+
+      <div class="field">
+        <label class="label" for="language">Мова відео (для STT)</label>
+        <select id="language">
+          <option value="en">English</option>
+          <option value="uk">Українська</option>
+          <option value="de">Deutsch</option>
+          <option value="fr">Français</option>
+          <option value="es">Español</option>
+          <option value="it">Italiano</option>
+          <option value="pl">Polski</option>
+          <option value="pt">Português</option>
+          <option value="ja">日本語</option>
+          <option value="ko">한국어</option>
+          <option value="zh">中文</option>
+        </select>
+        <span class="hint">Мова контенту який ти дивишся, а не мова перекладу</span>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label class="label" for="subFontFamily">Шрифт</label>
+          <select id="subFontFamily">
+            <option value="Inter">Inter</option>
+            <option value="Roboto">Roboto</option>
+            <option value="Open Sans">Open Sans</option>
+            <option value="Georgia">Georgia</option>
+            <option value="'Courier New'">Courier New</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="label">Розмір тексту — <span id="fontSizeVal">20</span>px</label>
+          <div class="range-row">
+            <input type="range" id="subFontSize" min="12" max="48" step="1" value="20" />
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label class="label" for="subColor">Колір тексту</label>
+          <input type="color" id="subColor" value="#ffffff" />
+        </div>
+        <div class="field">
+          <label class="label" for="subBgColor">Колір фону</label>
+          <input type="color" id="subBgColor" value="#000000" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">Прозорість фону — <span id="bgOpacityVal">70</span>%</label>
+        <div class="range-row">
+          <input type="range" id="subBgOpacity" min="0" max="100" step="1" value="70" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label class="label">Позиція</label>
+          <div class="seg-group">
+            <input type="radio" name="subPosition" id="posTop" value="top" />
+            <label for="posTop">Зверху</label>
+            <input type="radio" name="subPosition" id="posBottom" value="bottom" checked />
+            <label for="posBottom">Знизу</label>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label">Вирівнювання</label>
+          <div class="seg-group">
+            <input type="radio" name="subAlign" id="alignLeft" value="left" />
+            <label for="alignLeft">←</label>
+            <input type="radio" name="subAlign" id="alignCenter" value="center" checked />
+            <label for="alignCenter">↔</label>
+            <input type="radio" name="subAlign" id="alignRight" value="right" />
+            <label for="alignRight">→</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">Відступ від краю — <span id="offsetVal">8</span>%</label>
+        <div class="range-row">
+          <input type="range" id="subOffset" min="0" max="20" step="1" value="8" />
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Прев'ю</div>
+      <div class="preview-wrap">
+        <div class="preview-scene">
+          <div class="preview-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+          </div>
+        </div>
+        <div class="preview-overlay" id="previewOverlay">
+          <div class="preview-subtitle-wrap" id="previewSubtitleWrap">
+            <span id="previewText">The dog began to bark at the stranger.</span>
+          </div>
+        </div>
+      </div>
+      <div class="preview-label">Прев'ю субтитрів в реальному часі</div>
+    </div>
+
+    <button class="save-btn" id="saveBtn">Зберегти</button>
+  </div>
+
+  <div class="toast" id="toast">Збережено ✓</div>
+
+  <script type="module" src="index.ts"></script>
+</body>
+</html>

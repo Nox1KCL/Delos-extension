@@ -1,0 +1,60 @@
+{
+  "manifest_version": 3,
+  "name": "Delos",
+  "version": "0.1.0",
+  "description": "Real-time subtitles for Netflix/YouTube with contextual word translation",
+
+  "permissions": [
+    "tabs",
+    "tabCapture",
+    "offscreen",
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+
+  "host_permissions": [
+    "https://www.netflix.com/*",
+    "https://www.youtube.com/*",
+    "https://www.amazon.com/*",
+    "https://www.primevideo.com/*",
+    "https://www.hbo.com/*",
+    "https://www.disneyplus.com/*"
+  ],
+
+  "background": {
+    "service_worker": "src/background/index.ts",
+    "type": "module"
+  },
+
+  "action": {
+    "default_popup": "src/popup/index.html",
+    "default_title": "Delos"
+  },
+
+  "options_page": "src/options/index.html",
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.netflix.com/*",
+        "https://www.youtube.com/*",
+        "https://www.amazon.com/*",
+        "https://www.primevideo.com/*",
+        "https://www.hbo.com/*",
+        "https://www.disneyplus.com/*"
+      ],
+      "exclude_matches": [
+        "https://music.youtube.com/*",
+        "https://open.spotify.com/*",
+        "https://spotify.com/*",
+        "https://music.apple.com/*",
+        "https://soundcloud.com/*",
+        "https://www.deezer.com/*",
+        "https://tidal.com/*"
+      ],
+      "js": ["src/content/index.ts"],
+      "run_at": "document_idle"
+    }
+  ]
+}

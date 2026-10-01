@@ -4,6 +4,13 @@
   "version": "0.1.0",
   "description": "Real-time subtitles for Netflix/YouTube with contextual word translation",
 
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+
   "permissions": [
     "tabs",
     "tabCapture",
@@ -14,12 +21,7 @@
   ],
 
   "host_permissions": [
-    "https://www.netflix.com/*",
-    "https://www.youtube.com/*",
-    "https://www.amazon.com/*",
-    "https://www.primevideo.com/*",
-    "https://www.hbo.com/*",
-    "https://www.disneyplus.com/*"
+    "<all_urls>"
   ],
 
   "background": {
@@ -29,7 +31,13 @@
 
   "action": {
     "default_popup": "src/popup/index.html",
-    "default_title": "Delos"
+    "default_title": "Delos",
+    "default_icon": {
+      "16": "icons/icon-off-16.png",
+      "32": "icons/icon-off-32.png",
+      "48": "icons/icon-off-48.png",
+      "128": "icons/icon-off-128.png"
+    }
   },
 
   "options_page": "src/options/index.html",
@@ -37,24 +45,22 @@
   "content_scripts": [
     {
       "matches": [
-        "https://www.netflix.com/*",
-        "https://www.youtube.com/*",
-        "https://www.amazon.com/*",
-        "https://www.primevideo.com/*",
-        "https://www.hbo.com/*",
-        "https://www.disneyplus.com/*"
+        "http://*/*",
+        "https://*/*"
       ],
       "exclude_matches": [
-        "https://music.youtube.com/*",
-        "https://open.spotify.com/*",
-        "https://spotify.com/*",
-        "https://music.apple.com/*",
-        "https://soundcloud.com/*",
-        "https://www.deezer.com/*",
-        "https://tidal.com/*"
+        "*://music.youtube.com/*",
+        "*://*.spotify.com/*",
+        "*://music.apple.com/*",
+        "*://*.soundcloud.com/*",
+        "*://*.deezer.com/*",
+        "*://*.tidal.com/*",
+        "*://*.tiktok.com/*",
+        "*://www.youtube.com/shorts/*"
       ],
       "js": ["src/content/index.ts"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ]
 }

@@ -7,7 +7,11 @@ export default defineConfig({
     crx({ manifest }),
   ],
   build: {
-    // Produce a clean dist/ on each build
     emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        offscreen: 'src/offscreen/index.html',
+      },
+    },
   },
 });

@@ -7,11 +7,27 @@ export const BLACKLISTED_HOSTS: readonly string[] = [
   'www.deezer.com',
   'deezer.com',
   'tidal.com',
+  'tiktok.com',
+  'www.tiktok.com',
 ] as const;
+
+export const BLACKLISTED_PATH_PREFIXES: readonly string[] = [
+  '/shorts/',
+  '/reels/',
+] as const;
+
+export const VIDEO_CONSTRAINTS = {
+  MIN_DURATION_SEC: 60,
+  MIN_WIDTH_PX:     200,
+  MIN_HEIGHT_PX:    120,
+} as const;
 
 export const STORAGE_KEYS = {
   API_KEY:              'deepgramApiKey',
   LANGUAGE:             'language',
+  TARGET_LANGUAGE:      'targetLanguage',
+  UI_LANGUAGE:          'ui_language',
+  THEME:                'ui_theme',
   SUBTITLE_FONT_SIZE:   'sub_fontSize',
   SUBTITLE_FONT_FAMILY: 'sub_fontFamily',
   SUBTITLE_COLOR:       'sub_color',
@@ -26,18 +42,24 @@ export const SUBTITLE_DEFAULTS = {
   fontSize:   20,
   fontFamily: 'Inter',
   color:      '#ffffff',
-  bgColor:    '#000000',
-  bgOpacity:  70,
+  bgColor:    '#141416',
+  bgOpacity:  75,
   position:   'bottom' as 'top' | 'bottom',
   offset:     8,
   align:      'center' as 'left' | 'center' | 'right',
 } as const;
 
 export const DEFAULT_LANGUAGE = 'en';
+export const DEFAULT_TARGET_LANGUAGE = 'uk';
+export const DEFAULT_UI_LANGUAGE = 'en' as 'en' | 'uk';
+export const DEFAULT_THEME = 'dark' as 'dark' | 'light';
 
 export const MSG = {
-  GET_STATUS:    'GET_STATUS',
-  TOGGLE:        'TOGGLE',
-  OPEN_OPTIONS:  'OPEN_OPTIONS',
-  STATE_CHANGED: 'DELOS_STATE_CHANGED',
+  GET_STATUS:      'GET_STATUS',
+  TOGGLE:          'TOGGLE',
+  OPEN_OPTIONS:    'OPEN_OPTIONS',
+  STATE_CHANGED:   'DELOS_STATE_CHANGED',
+  START_CAPTURE:   'OFFSCREEN_START_CAPTURE',
+  STOP_CAPTURE:    'OFFSCREEN_STOP_CAPTURE',
+  CAPTURE_STOPPED: 'OFFSCREEN_CAPTURE_STOPPED',
 } as const;

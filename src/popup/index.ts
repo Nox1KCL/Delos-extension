@@ -1,7 +1,12 @@
-import { MSG } from '../shared/constants';
+import {
+  DEFAULT_THEME,
+  DEFAULT_UI_LANGUAGE,
+  MSG,
+  STORAGE_KEYS,
+} from '../shared/constants';
+import { applyUiLocale, t, type UiLocale } from '../shared/i18n';
+import { applyTheme, type ThemeMode } from '../shared/theme';
 import type { StatusResponse, ToggleResponse } from '../shared/types';
-
-// ─── DOM refs ─────────────────────────────────────────────────────────────────
 
 const toggleInput    = document.getElementById('toggleInput')    as HTMLInputElement;
 const toggleSublabel = document.getElementById('toggleSublabel') as HTMLElement;
@@ -10,14 +15,23 @@ const badgeNoKey     = document.getElementById('badgeNoKey')     as HTMLElement;
 const settingsBtn    = document.getElementById('settingsBtn')    as HTMLButtonElement;
 const settingsLink   = document.getElementById('settingsLink')   as HTMLButtonElement;
 
-// ─── State ────────────────────────────────────────────────────────────────────
-
 let currentTabId = -1;
 
-// ─── Init ─────────────────────────────────────────────────────────────────────
-
 async function init(): Promise<void> {
-  // Ask background for the current tab's status
+  try {
+    const stored = await chrome.storage.local.get([
+      STORAGE_KEYS.THEME,
+      STORAGE_KEYS.UI_LANGUAGE,
+    ]);
+    const theme = ((stored[STORAGE_KEYS.THEME] as string) || DEFAULT_THEME) as ThemeMode;
+    const locale = ((stored[STORAGE_KEYS.UI_LANGUAGE] as string) || DEFAULT_UI_LANGUAGE) as UiLocale;
+    applyTheme(theme);
+    applyUiLocale(locale);
+  } catch {
+    applyTheme(DEFAULT_THEME);
+    applyUiLocale(DEFAULT_UI_LANGUAGE);
+  }
+
   const status = await chrome.runtime.sendMessage<typeof MSG.GET_STATUS, StatusResponse>(
     { type: MSG.GET_STATUS }
   );
@@ -26,40 +40,30 @@ async function init(): Promise<void> {
   render(status);
 }
 
-// ─── Render ───────────────────────────────────────────────────────────────────
-
 function render(status: StatusResponse): void {
-  // Reset visibility
   badgeBlocked.style.display = 'none';
   badgeNoKey.style.display   = 'none';
   toggleInput.disabled       = false;
 
   if (status.blocked) {
-    // Music site — show blocked badge, disable toggle
     badgeBlocked.style.display = 'flex';
     toggleInput.disabled = true;
     toggleInput.checked  = false;
-    toggleSublabel.textContent = 'Недоступно';
+    toggleSublabel.textContent = t('popupBlocked');
     return;
   }
 
   if (!status.hasApiKey) {
-    // No API key set — warn user, disable toggle
     badgeNoKey.style.display = 'flex';
     toggleInput.disabled = true;
     toggleInput.checked  = false;
-    toggleSublabel.textContent = 'Потрібен API ключ';
+    toggleSublabel.textContent = t('popupNeedKey');
     return;
   }
 
-  // Normal state
   toggleInput.checked = status.active;
-  toggleSublabel.textContent = status.active
-    ? `Активно · ${status.language.toUpperCase()}`
-    : 'Вимкнено';
+  toggleSublabel.textContent = status.active ? t('popupOn') : t('popupOff');
 }
-
-// ─── Events ───────────────────────────────────────────────────────────────────
 
 toggleInput.addEventListener('change', async () => {
   const response = await chrome.runtime.sendMessage<typeof MSG.TOGGLE, ToggleResponse>({
@@ -68,9 +72,8 @@ toggleInput.addEventListener('change', async () => {
   });
 
   if (response.success && response.active !== undefined) {
-    toggleSublabel.textContent = response.active ? 'Активно' : 'Вимкнено';
+    toggleSublabel.textContent = response.active ? t('popupOn') : t('popupOff');
   } else {
-    // Something went wrong — revert the visual toggle state
     toggleInput.checked = !toggleInput.checked;
 
     if (response.reason === 'no_api_key') {
@@ -86,7 +89,5 @@ function openOptions(): void {
 
 settingsBtn.addEventListener('click', openOptions);
 settingsLink.addEventListener('click', openOptions);
-
-// ─── Bootstrap ────────────────────────────────────────────────────────────────
 
 init();

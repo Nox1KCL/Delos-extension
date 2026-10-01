@@ -1,0 +1,159 @@
+:root,
+:root[data-theme="dark"] {
+  --bg-page: #141416;
+  --bg-panel: #1b1b1e;
+  --bg-header: #1f1a1f;
+  --bg-control: #111113;
+  --bg-control-hover: #232127;
+
+  --border-main: #28262c;
+  --border-accent: #57214b;
+  --border-focus: #e5be77;
+
+  --brand-burgundy: #3b1533;
+  --brand-gold: #e5be77;
+
+  --accent-bg: #3b1533;
+  --accent-text: #e5be77;
+  --accent-border: #57214b;
+
+  --highlight: #e5be77;
+  --link-color: #e5be77;
+
+  --text-main: #f2efe9;
+  --text-muted: #a39d93;
+  --text-dim: #6e6961;
+
+  --status-ok-bg: #17261c;
+  --status-ok-border: #25422e;
+  --status-ok-text: #75c991;
+
+  --status-warn-bg: #291f14;
+  --status-warn-border: #4a351d;
+  --status-warn-text: #e5be77;
+
+  --status-err-bg: #291416;
+  --status-err-border: #4d2226;
+  --status-err-text: #f28b82;
+}
+
+:root[data-theme="light"] {
+  --bg-page: #f2ede4;
+  --bg-panel: #faf7f2;
+  --bg-header: #efe7d8;
+  --bg-control: #e8e0d1;
+  --bg-control-hover: #ddd3c0;
+
+  --border-main: #d4cab8;
+  --border-accent: #3b1533;
+  --border-focus: #3b1533;
+
+  --brand-burgundy: #3b1533;
+  --brand-gold: #e5be77;
+
+  --accent-bg: #3b1533;
+  --accent-text: #e5be77;
+  --accent-border: #3b1533;
+
+  --highlight: #3b1533;
+  --link-color: #3b1533;
+
+  --text-main: #1e171c;
+  --text-muted: #5a5056;
+  --text-dim: #857980;
+
+  --status-ok-bg: #e1f0e5;
+  --status-ok-border: #b0d8bc;
+  --status-ok-text: #1c5e31;
+
+  --status-warn-bg: #f4e8d1;
+  --status-warn-border: #dbc092;
+  --status-warn-text: #6e4c11;
+
+  --status-err-bg: #fae1e1;
+  --status-err-border: #deb4b4;
+  --status-err-text: #8c2222;
+}
+
+.delos-sub-word {
+  display: inline-block;
+  padding: 0 2px;
+  border-radius: 3px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.delos-sub-word:hover,
+.delos-sub-word.selected {
+  color: inherit;
+  outline: 1px solid currentColor;
+}
+
+.delos-word-popup {
+  position: absolute;
+  z-index: 20;
+  min-width: 150px;
+  max-width: 240px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  padding: 7px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  pointer-events: auto;
+}
+
+.delos-word-popup__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid currentColor;
+}
+
+.delos-word-popup__word {
+  font-weight: 600;
+  color: inherit;
+}
+
+.delos-word-popup__close {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px;
+}
+
+.delos-word-popup__translation {
+  font-weight: 400;
+  color: inherit;
+  line-height: 1.35;
+}
+
+.delos-word-popup__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.delos-word-popup__settings {
+  background: none;
+  border: none;
+  color: inherit;
+  padding: 2px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.delos-word-popup__settings svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}

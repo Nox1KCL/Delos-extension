@@ -1,5 +1,3 @@
-// ─── Messages: Popup / Options → Background ───────────────────────────────────
-
 export interface GetStatusMsg {
   type: 'GET_STATUS';
 }
@@ -13,34 +11,47 @@ export interface OpenOptionsMsg {
   type: 'OPEN_OPTIONS';
 }
 
-export type ToBackgroundMsg = GetStatusMsg | ToggleMsg | OpenOptionsMsg;
+export interface CaptureStoppedMsg {
+  type: 'OFFSCREEN_CAPTURE_STOPPED';
+  tabId: number;
+}
 
-// ─── Messages: Background → Content Script ────────────────────────────────────
+export type ToBackgroundMsg =
+  | GetStatusMsg
+  | ToggleMsg
+  | OpenOptionsMsg
+  | CaptureStoppedMsg;
+
+export interface StartCaptureMsg {
+  type: 'OFFSCREEN_START_CAPTURE';
+  target: 'offscreen';
+  streamId: string;
+  tabId: number;
+}
+
+export interface StopCaptureMsg {
+  type: 'OFFSCREEN_STOP_CAPTURE';
+  target: 'offscreen';
+}
+
+export type ToOffscreenMsg = StartCaptureMsg | StopCaptureMsg;
 
 export interface StateChangedMsg {
   type: 'DELOS_STATE_CHANGED';
   active: boolean;
 }
 
-// ─── Response types ───────────────────────────────────────────────────────────
-
-/** Returned by GET_STATUS */
 export interface StatusResponse {
-  /** Is Delos currently active for this tab? */
   active: boolean;
-  /** Is this tab on the blacklist? */
   blocked: boolean;
-  /** Has the user saved a Deepgram API key? */
   hasApiKey: boolean;
-  /** Currently selected subtitle language code, e.g. "en" */
   language: string;
-  /** Current tab id (for the popup to send a TOGGLE) */
+  targetLanguage: string;
   tabId: number;
 }
 
-/** Returned by TOGGLE */
 export interface ToggleResponse {
   success: boolean;
   active?: boolean;
-  reason?: 'blocked' | 'no_api_key';
+  reason?: 'blocked' | 'no_api_key' | 'capture_failed';
 }

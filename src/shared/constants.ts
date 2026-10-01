@@ -54,6 +54,14 @@ export const DEFAULT_TARGET_LANGUAGE = 'uk';
 export const DEFAULT_UI_LANGUAGE = 'en' as 'en' | 'uk';
 export const DEFAULT_THEME = 'dark' as 'dark' | 'light';
 
+export const BACKEND_WS_URL = 'ws://localhost:8080/delos/api/v1/audio/dg';
+
+export const VAD = {
+  RMS_THRESHOLD:         0.008,
+  HANGOVER_MS:           800,
+  SILENCE_DISCONNECT_MS: 4000,
+} as const;
+
 export const MSG = {
   GET_STATUS:      'GET_STATUS',
   TOGGLE:          'TOGGLE',
@@ -62,4 +70,7 @@ export const MSG = {
   START_CAPTURE:   'OFFSCREEN_START_CAPTURE',
   STOP_CAPTURE:    'OFFSCREEN_STOP_CAPTURE',
   CAPTURE_STOPPED: 'OFFSCREEN_CAPTURE_STOPPED',
+  GET_VIDEO_INFO:  'GET_VIDEO_INFO',
+  VIDEO_TIME_SYNC: 'DELOS_VIDEO_TIME_SYNC',
+  SUBTITLE:        'DELOS_SUBTITLE',
 } as const;

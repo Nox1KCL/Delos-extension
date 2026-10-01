@@ -16,17 +16,42 @@ export interface CaptureStoppedMsg {
   tabId: number;
 }
 
+export interface SubtitleMsg {
+  type: 'DELOS_SUBTITLE';
+  tabId: number;
+  text: string;
+  startSec: number;
+  endSec: number;
+  isFinal: boolean;
+}
+
+export interface VideoTimeSyncMsg {
+  type: 'DELOS_VIDEO_TIME_SYNC';
+  target?: 'offscreen';
+  currentTime: number;
+  paused: boolean;
+  playbackRate: number;
+}
+
 export type ToBackgroundMsg =
   | GetStatusMsg
   | ToggleMsg
   | OpenOptionsMsg
-  | CaptureStoppedMsg;
+  | CaptureStoppedMsg
+  | SubtitleMsg
+  | VideoTimeSyncMsg;
 
 export interface StartCaptureMsg {
   type: 'OFFSCREEN_START_CAPTURE';
   target: 'offscreen';
   streamId: string;
   tabId: number;
+  apiKey: string;
+  language: string;
+  videoUrl: string;
+  duration: number;
+  baseTime: number;
+  backendWsUrl: string;
 }
 
 export interface StopCaptureMsg {
@@ -34,11 +59,21 @@ export interface StopCaptureMsg {
   target: 'offscreen';
 }
 
-export type ToOffscreenMsg = StartCaptureMsg | StopCaptureMsg;
+export type ToOffscreenMsg = StartCaptureMsg | StopCaptureMsg | VideoTimeSyncMsg;
 
 export interface StateChangedMsg {
   type: 'DELOS_STATE_CHANGED';
   active: boolean;
+}
+
+export interface GetVideoInfoMsg {
+  type: 'GET_VIDEO_INFO';
+}
+
+export interface VideoInfoResponse {
+  url: string;
+  duration: number;
+  currentTime: number;
 }
 
 export interface StatusResponse {
@@ -53,5 +88,5 @@ export interface StatusResponse {
 export interface ToggleResponse {
   success: boolean;
   active?: boolean;
-  reason?: 'blocked' | 'no_api_key' | 'capture_failed';
+  reason?: 'blocked' | 'no_api_key' | 'capture_failed' | 'no_video';
 }

@@ -79,6 +79,11 @@ toggleInput.addEventListener('change', async () => {
     if (response.reason === 'no_api_key') {
       badgeNoKey.style.display = 'flex';
       toggleInput.disabled = true;
+      toggleSublabel.textContent = t('popupNeedKey');
+    } else if (response.reason === 'no_video') {
+      toggleSublabel.textContent = t('popupNoVideo');
+    } else if (response.reason === 'capture_failed') {
+      toggleSublabel.textContent = t('popupCaptureFailed');
     }
   }
 });

@@ -74,6 +74,8 @@ const en = {
   popupOn: 'Active',
   popupBlocked: 'Not available on this site',
   popupNeedKey: 'Add API key in settings',
+  popupNoVideo: 'No video found (refresh tab or play video)',
+  popupCaptureFailed: 'Capture failed (refresh tab)',
   popupOpenSettings: 'Settings',
 };
 
@@ -133,6 +135,8 @@ const uk: TranslationDict = {
   popupOn: 'Працює',
   popupBlocked: 'Недоступно на цьому сайті',
   popupNeedKey: 'Додай API ключ у налаштуваннях',
+  popupNoVideo: 'Відео не знайдено (онови вкладку або увімкни відео)',
+  popupCaptureFailed: 'Помилка захоплення (онови вкладку)',
   popupOpenSettings: 'Налаштування',
 };
 

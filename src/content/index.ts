@@ -1,9 +1,11 @@
-import type { StateChangedMsg } from '../shared/types';
+import type { StateChangedMsg, VideoInfoResponse } from '../shared/types';
 import { BLACKLISTED_PATH_PREFIXES, MSG, VIDEO_CONSTRAINTS } from '../shared/constants';
 
 let isDelosEnabled = false;
 let activeVideo: HTMLVideoElement | null = null;
 let domObserver: MutationObserver | null = null;
+
+console.log('[Delos Content] Injected on', window.location.href);
 
 function isQualifyingVideo(video: HTMLVideoElement): boolean {
   if (
@@ -14,7 +16,7 @@ function isQualifyingVideo(video: HTMLVideoElement): boolean {
     return false;
   }
 
-  if (Number.isNaN(video.duration) || video.duration < VIDEO_CONSTRAINTS.MIN_DURATION_SEC) {
+  if (!Number.isFinite(video.duration) || video.duration < VIDEO_CONSTRAINTS.MIN_DURATION_SEC) {
     return false;
   }
 
@@ -47,22 +49,51 @@ function findMainVideo(): HTMLVideoElement | null {
   return best;
 }
 
+let lastTimeSync = 0;
+
+function sendVideoTimeSync(): void {
+  if (!activeVideo || !isDelosEnabled) return;
+  chrome.runtime.sendMessage({
+    type: MSG.VIDEO_TIME_SYNC,
+    currentTime: activeVideo.currentTime,
+    paused: activeVideo.paused,
+    playbackRate: activeVideo.playbackRate || 1,
+  }).catch(() => {});
+}
+
+function onVideoTimeUpdate(): void {
+  const now = Date.now();
+  if (now - lastTimeSync >= 1000) {
+    lastTimeSync = now;
+    sendVideoTimeSync();
+  }
+}
+
+function onVideoPlaybackEvent(): void {
+  sendVideoTimeSync();
+}
+
 function attachToVideo(video: HTMLVideoElement): void {
   if (activeVideo === video) return;
+  detachVideo();
   activeVideo = video;
 
-  const durationLabel = Number.isFinite(video.duration)
-    ? `${Math.round(video.duration)}s`
-    : 'LIVE';
-  console.log(
-    `[Delos] Activated on qualifying <video> (${durationLabel}) in`,
-    window.location.hostname
-  );
+  video.addEventListener('timeupdate', onVideoTimeUpdate);
+  video.addEventListener('seeked', onVideoPlaybackEvent);
+  video.addEventListener('pause', onVideoPlaybackEvent);
+  video.addEventListener('play', onVideoPlaybackEvent);
+  video.addEventListener('ratechange', onVideoPlaybackEvent);
+
+  sendVideoTimeSync();
 }
 
 function detachVideo(): void {
   if (activeVideo) {
-    console.log('[Delos] Deactivated on', window.location.hostname);
+    activeVideo.removeEventListener('timeupdate', onVideoTimeUpdate);
+    activeVideo.removeEventListener('seeked', onVideoPlaybackEvent);
+    activeVideo.removeEventListener('pause', onVideoPlaybackEvent);
+    activeVideo.removeEventListener('play', onVideoPlaybackEvent);
+    activeVideo.removeEventListener('ratechange', onVideoPlaybackEvent);
     activeVideo = null;
   }
 }
@@ -73,7 +104,7 @@ function evaluateVideos(): void {
   const candidate = findMainVideo();
   if (candidate) {
     attachToVideo(candidate);
-  } else if (activeVideo && ! isQualifyingVideo(activeVideo)) {
+  } else if (activeVideo && !isQualifyingVideo(activeVideo)) {
     detachVideo();
   }
 }
@@ -113,13 +144,43 @@ function stopWatchingVideos(): void {
   detachVideo();
 }
 
-chrome.runtime.onMessage.addListener((message: StateChangedMsg) => {
-  if (message.type !== MSG.STATE_CHANGED) return;
+chrome.runtime.onMessage.addListener(
+  (
+    message: { type: string; text?: string; startSec?: number; endSec?: number; isFinal?: boolean; active?: boolean },
+    _sender,
+    sendResponse: (r?: VideoInfoResponse | undefined) => void
+  ) => {
+    if (message.type === MSG.STATE_CHANGED) {
+      isDelosEnabled = (message as StateChangedMsg).active;
+      if (isDelosEnabled) {
+        startWatchingVideos();
+      } else {
+        stopWatchingVideos();
+      }
+      return false;
+    }
 
-  isDelosEnabled = message.active;
-  if (isDelosEnabled) {
-    startWatchingVideos();
-  } else {
-    stopWatchingVideos();
+    if (message.type === MSG.GET_VIDEO_INFO) {
+      const video = findMainVideo();
+      console.log('[Delos Content] Query video:', video ? { duration: video.duration, currentTime: video.currentTime } : 'no qualifying video');
+      if (video && Number.isFinite(video.duration) && video.duration > 0) {
+        sendResponse({
+          url: window.location.href,
+          duration: video.duration,
+          currentTime: video.currentTime,
+        });
+      }
+      return false;
+    }
+
+    if (message.type === MSG.SUBTITLE) {
+      console.log(
+        `[Delos] Subtitle [${message.startSec?.toFixed(1)}s–${message.endSec?.toFixed(1)}s]:`,
+        message.text
+      );
+      return false;
+    }
+
+    return false;
   }
-});
+);

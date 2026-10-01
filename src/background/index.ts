@@ -1,4 +1,5 @@
 import {
+  BACKEND_WS_URL,
   BLACKLISTED_HOSTS,
   BLACKLISTED_PATH_PREFIXES,
   DEFAULT_LANGUAGE,
@@ -10,8 +11,10 @@ import type {
   StartCaptureMsg,
   StatusResponse,
   StopCaptureMsg,
+  SubtitleMsg,
   ToBackgroundMsg,
   ToggleResponse,
+  VideoInfoResponse,
 } from '../shared/types';
 
 const OFFSCREEN_DOCUMENT_PATH = 'src/offscreen/index.html';
@@ -143,7 +146,7 @@ async function ensureOffscreenDocument(): Promise<void> {
         chrome.offscreen.Reason.USER_MEDIA,
         chrome.offscreen.Reason.AUDIO_PLAYBACK,
       ],
-      justification: 'Capture tab audio stream for STT and play loopback audio to user',
+      justification: 'Capture tab audio for real-time speech-to-text and loopback playback',
     })
     .finally(() => {
       creatingOffscreenPromise = null;
@@ -168,7 +171,29 @@ function getTabMediaStreamId(tabId: number): Promise<string> {
   });
 }
 
+async function getVideoInfo(tabId: number): Promise<VideoInfoResponse | null> {
+  try {
+    const response = await chrome.tabs.sendMessage(tabId, {
+      type: MSG.GET_VIDEO_INFO,
+    });
+    if (response?.url && response?.duration > 0) {
+      return response as VideoInfoResponse;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function startTabAudioCapture(tabId: number): Promise<void> {
+  const apiKey = await getApiKey();
+  if (!apiKey) throw new Error('No API key');
+
+  const language = await getLanguage();
+  const videoInfo = await getVideoInfo(tabId);
+
+  if (!videoInfo) throw new Error('No qualifying video found on this tab');
+
   await ensureOffscreenDocument();
   const streamId = await getTabMediaStreamId(tabId);
 
@@ -177,6 +202,12 @@ async function startTabAudioCapture(tabId: number): Promise<void> {
     target: 'offscreen',
     streamId,
     tabId,
+    apiKey,
+    language,
+    videoUrl: videoInfo.url,
+    duration: videoInfo.duration,
+    baseTime: videoInfo.currentTime,
+    backendWsUrl: BACKEND_WS_URL,
   };
 
   const response = await chrome.runtime.sendMessage<
@@ -225,7 +256,7 @@ async function deactivateCurrentTab(): Promise<void> {
 
 chrome.runtime.onMessage.addListener(
   (
-    message: ToBackgroundMsg & { target?: string },
+    message: (ToBackgroundMsg | SubtitleMsg) & { target?: string },
     _sender,
     sendResponse: (r: StatusResponse | ToggleResponse | { success: boolean }) => void
   ) => {
@@ -233,7 +264,33 @@ chrome.runtime.onMessage.addListener(
       return false;
     }
 
-    handleMessage(message).then(sendResponse);
+    if (message?.type === MSG.SUBTITLE) {
+      const subMsg = message as SubtitleMsg;
+      if (subMsg.tabId > 0) {
+        chrome.tabs
+          .sendMessage(subMsg.tabId, {
+            type: MSG.SUBTITLE,
+            text: subMsg.text,
+            startSec: subMsg.startSec,
+            endSec: subMsg.endSec,
+            isFinal: subMsg.isFinal,
+          })
+          .catch(() => {});
+      }
+      return false;
+    }
+
+    if (message?.type === MSG.VIDEO_TIME_SYNC) {
+      chrome.runtime
+        .sendMessage({
+          ...message,
+          target: 'offscreen',
+        })
+        .catch(() => {});
+      return false;
+    }
+
+    handleMessage(message as ToBackgroundMsg).then(sendResponse);
     return true;
   }
 );
@@ -307,7 +364,10 @@ async function handleMessage(
     } catch (err) {
       console.error('[Delos Background] Failed to start tab capture:', err);
       await deactivateCurrentTab();
-      return { success: false, reason: 'capture_failed' } satisfies ToggleResponse;
+      const reason = err instanceof Error && err.message.includes('No qualifying video')
+        ? 'no_video' as const
+        : 'capture_failed' as const;
+      return { success: false, reason } satisfies ToggleResponse;
     }
   }
 

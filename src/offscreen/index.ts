@@ -19,7 +19,7 @@ let lastSyncWallClock = 0;
 let isVideoPaused = false;
 let videoPlaybackRate = 1;
 
-const SILENT_CHUNK = new ArrayBuffer(6400);
+const SILENT_CHUNK = new ArrayBuffer(3200);
 
 interface CaptureConfig {
   apiKey: string;
@@ -48,32 +48,48 @@ function openWs(): void {
   pendingChunks = [];
 
   const url = config?.backendWsUrl ?? BACKEND_WS_URL;
+  console.log('[Delos Offscreen] Opening WebSocket to:', url);
   ws = new WebSocket(url);
   ws.binaryType = 'arraybuffer';
 
   ws.onopen = () => {
-    const handshake = JSON.stringify({
-      api_key: config!.apiKey,
-      base_time: getCurrentVideoTime(),
-      options: {
-        model: 'nova-3',
-        language: config!.language,
-      },
-      video_url: config!.videoUrl,
-      duration: config!.duration,
-    });
-    ws!.send(handshake);
-    wsReady = true;
+    try {
+      console.log('[Delos Offscreen] WebSocket connected! Sending handshake...');
+      if (!config) {
+        console.error('[Delos Offscreen] Cannot send handshake: config is null');
+        return;
+      }
+      const handshake = JSON.stringify({
+        api_key: config.apiKey,
+        base_time: getCurrentVideoTime(),
+        options: {
+          model: 'nova-2',
+          language: config.language,
+        },
+        video_url: config.videoUrl,
+        duration: config.duration,
+      });
+      ws!.send(handshake);
+      wsReady = true;
+      console.log('[Delos Offscreen] Handshake sent:', {
+        model: 'nova-2',
+        language: config.language,
+        baseTime: getCurrentVideoTime(),
+      });
 
-    for (const chunk of pendingChunks) {
-      ws!.send(chunk);
+      for (const chunk of pendingChunks) {
+        ws!.send(chunk);
+      }
+      pendingChunks = [];
+    } catch (err) {
+      console.error('[Delos Offscreen] Error in ws.onopen:', err);
     }
-    pendingChunks = [];
   };
 
   ws.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data as string);
+      console.log('[Delos Offscreen] Received message from backend:', data);
       if (data.text && activeTabId !== null) {
         chrome.runtime.sendMessage({
           type: MSG.SUBTITLE,
@@ -82,23 +98,32 @@ function openWs(): void {
           startSec: data.start_sec ?? 0,
           endSec: data.end_sec ?? 0,
           isFinal: data.is_final ?? false,
-        }).catch(() => {});
+        }).catch((err) => {
+          console.warn('[Delos Offscreen] Failed to forward subtitle to tab:', err);
+        });
       }
-    } catch {}
+    } catch (err) {
+      console.error('[Delos Offscreen] Failed to parse message JSON:', err, event.data);
+    }
   };
 
-  ws.onerror = () => {
+  ws.onerror = (e) => {
+    console.error('[Delos Offscreen] WebSocket error:', e);
     wsReady = false;
   };
 
-  ws.onclose = () => {
+  ws.onclose = (e) => {
+    console.warn('[Delos Offscreen] WebSocket closed:', e.code, e.reason);
     wsReady = false;
+    ws = null;
   };
 }
 
 function closeWs(): void {
   wsReady = false;
   pendingChunks = [];
+  isSpeaking = false;
+  clearAllTimers();
   if (ws) {
     try { ws.close(); } catch {}
     ws = null;
@@ -117,6 +142,10 @@ function clearAllTimers(): void {
 }
 
 function handlePcmChunk(pcm: ArrayBuffer, rms: number): void {
+  if (isVideoPaused) {
+    return;
+  }
+
   const speechDetected = rms > VAD.RMS_THRESHOLD;
 
   if (speechDetected) {
@@ -124,19 +153,11 @@ function handlePcmChunk(pcm: ArrayBuffer, rms: number): void {
 
     if (!isSpeaking) {
       isSpeaking = true;
+      console.log('[Delos Offscreen] Speech started (RMS:', rms.toFixed(4), ')');
     }
 
     if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
       openWs();
-    }
-
-    if (wsReady && ws?.readyState === WebSocket.OPEN) {
-      ws.send(pcm);
-    } else {
-      if (pendingChunks.length > 25) {
-        pendingChunks.shift();
-      }
-      pendingChunks.push(pcm);
     }
   } else if (isSpeaking) {
     if (hangoverTimer === null) {
@@ -147,23 +168,34 @@ function handlePcmChunk(pcm: ArrayBuffer, rms: number): void {
         if (silenceDisconnectTimer === null) {
           silenceDisconnectTimer = setTimeout(() => {
             silenceDisconnectTimer = null;
+            console.log('[Delos Offscreen] Inactive for', VAD.SILENCE_DISCONNECT_MS, 'ms, closing socket');
             closeWs();
           }, VAD.SILENCE_DISCONNECT_MS);
         }
       }, VAD.HANGOVER_MS);
     }
+  }
 
-    if (wsReady && ws?.readyState === WebSocket.OPEN) {
-      ws.send(pcm);
+  // Always send real audio PCM while connected so Deepgram hears all speech nuances and soft words
+  if (wsReady && ws?.readyState === WebSocket.OPEN) {
+    ws.send(pcm);
+  } else if (speechDetected || isSpeaking) {
+    if (pendingChunks.length > 25) {
+      pendingChunks.shift();
     }
-  } else if (ws && ws.readyState === WebSocket.OPEN && wsReady) {
-    ws.send(SILENT_CHUNK);
+    pendingChunks.push(pcm);
   }
 }
 
-async function startCapture(streamId: string, tabId: number, baseTime: number): Promise<void> {
+async function startCapture(
+  streamId: string,
+  tabId: number,
+  baseTime: number,
+  newConfig: CaptureConfig
+): Promise<void> {
   await stopCapture(false);
 
+  config = newConfig;
   activeTabId = tabId;
   lastKnownVideoTime = baseTime;
   lastSyncWallClock = Date.now();
@@ -206,6 +238,9 @@ async function startCapture(streamId: string, tabId: number, baseTime: number): 
       void stopCapture(true);
     });
   }
+
+  // Pre-connect WebSocket so handshake is complete before the first word is uttered
+  openWs();
 }
 
 async function stopCapture(notifyBackground: boolean): Promise<void> {
@@ -261,7 +296,7 @@ chrome.runtime.onMessage.addListener(
     }
 
     if (message.type === MSG.START_CAPTURE) {
-      config = {
+      const newConfig: CaptureConfig = {
         apiKey: message.apiKey,
         language: message.language,
         videoUrl: message.videoUrl,
@@ -269,9 +304,10 @@ chrome.runtime.onMessage.addListener(
         backendWsUrl: message.backendWsUrl || BACKEND_WS_URL,
       };
 
-      startCapture(message.streamId, message.tabId, message.baseTime)
+      startCapture(message.streamId, message.tabId, message.baseTime, newConfig)
         .then(() => sendResponse({ success: true }))
         .catch((err: unknown) => {
+          console.error('[Delos Offscreen] startCapture failed:', err);
           const errorMsg = err instanceof Error ? err.message : String(err);
           sendResponse({ success: false, error: errorMsg });
         });
@@ -294,8 +330,16 @@ chrome.runtime.onMessage.addListener(
       videoPlaybackRate = syncMsg.playbackRate || 1;
 
       const jumped = Math.abs(syncMsg.currentTime - prevTime) > 2.0;
-      if ((syncMsg.paused || jumped) && ws) {
+      if (jumped) {
+        console.log(
+          `[Delos Offscreen] Video jump detected (from ${prevTime.toFixed(1)}s to ${syncMsg.currentTime.toFixed(1)}s), resetting socket for new base time`
+        );
         closeWs();
+      }
+
+      // If capture is active, video is playing, and socket is not open/ready: open it immediately!
+      if (config && !syncMsg.paused && (!ws || ws.readyState === WebSocket.CLOSED)) {
+        openWs();
       }
       return false;
     }

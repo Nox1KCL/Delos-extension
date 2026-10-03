@@ -32,9 +32,9 @@ async function init(): Promise<void> {
     applyUiLocale(DEFAULT_UI_LANGUAGE);
   }
 
-  const status = await chrome.runtime.sendMessage<typeof MSG.GET_STATUS, StatusResponse>(
-    { type: MSG.GET_STATUS }
-  );
+  const status = (await chrome.runtime.sendMessage({
+    type: MSG.GET_STATUS,
+  })) as StatusResponse;
 
   currentTabId = status.tabId;
   render(status);
@@ -66,10 +66,10 @@ function render(status: StatusResponse): void {
 }
 
 toggleInput.addEventListener('change', async () => {
-  const response = await chrome.runtime.sendMessage<typeof MSG.TOGGLE, ToggleResponse>({
+  const response = (await chrome.runtime.sendMessage({
     type: MSG.TOGGLE,
     tabId: currentTabId,
-  });
+  })) as ToggleResponse;
 
   if (response.success && response.active !== undefined) {
     toggleSublabel.textContent = response.active ? t('popupOn') : t('popupOff');

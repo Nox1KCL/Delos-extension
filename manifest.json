@@ -59,8 +59,7 @@
         "*://www.youtube.com/shorts/*"
       ],
       "js": ["src/content/index.ts"],
-      "run_at": "document_idle",
-      "all_frames": true
+      "run_at": "document_idle"
     }
   ]
 }

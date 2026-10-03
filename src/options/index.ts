@@ -367,7 +367,9 @@ async function loadSettings(): Promise<void> {
     subColor.value      = normalizeHex(String(result[STORAGE_KEYS.SUBTITLE_COLOR]    ?? SUBTITLE_DEFAULTS.color), SUBTITLE_DEFAULTS.color);
     subBgColor.value    = normalizeHex(String(result[STORAGE_KEYS.SUBTITLE_BG_COLOR] ?? SUBTITLE_DEFAULTS.bgColor), SUBTITLE_DEFAULTS.bgColor);
     subBgOpacity.value  = String(result[STORAGE_KEYS.SUBTITLE_BG_OPACITY]  ?? SUBTITLE_DEFAULTS.bgOpacity);
-    subOffset.value     = String(result[STORAGE_KEYS.SUBTITLE_OFFSET]      ?? SUBTITLE_DEFAULTS.offset);
+    const rawOffset = result[STORAGE_KEYS.SUBTITLE_OFFSET];
+    const effectiveOffset = typeof rawOffset === 'number' && rawOffset > 8 ? rawOffset : SUBTITLE_DEFAULTS.offset;
+    subOffset.value = String(effectiveOffset);
 
     setRadioValue('subPosition', String(result[STORAGE_KEYS.SUBTITLE_POSITION] ?? SUBTITLE_DEFAULTS.position));
     setRadioValue('subAlign',    String(result[STORAGE_KEYS.SUBTITLE_ALIGN]    ?? SUBTITLE_DEFAULTS.align));

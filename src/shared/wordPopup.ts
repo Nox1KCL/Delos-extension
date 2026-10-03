@@ -13,11 +13,15 @@ export interface SubtitleStyleSync {
 export interface WordPopupData {
   word: string;
   translation: string;
+  sentenceTranslation?: string;
+  loading?: boolean;
+  error?: string;
 }
 
 export interface WordPopupController {
   element: HTMLElement;
   show: (data: WordPopupData, anchorWordEl?: HTMLElement) => void;
+  update: (data: Partial<WordPopupData>) => void;
   hide: () => void;
   isOpen: () => boolean;
   syncStyle: (style: SubtitleStyleSync) => void;
@@ -56,6 +60,15 @@ export function createWordPopup(
   const translationEl = document.createElement('div');
   translationEl.className = 'delos-word-popup__translation';
 
+  const sentenceEl = document.createElement('div');
+  sentenceEl.className = 'delos-word-popup__sentence';
+  sentenceEl.style.display = 'none';
+
+  const loaderEl = document.createElement('div');
+  loaderEl.className = 'delos-word-popup__loader';
+  loaderEl.textContent = '···';
+  loaderEl.style.display = 'none';
+
   const footer = document.createElement('div');
   footer.className = 'delos-word-popup__footer';
 
@@ -68,7 +81,7 @@ export function createWordPopup(
 
   footer.appendChild(settingsBtn);
 
-  popup.append(header, translationEl, footer);
+  popup.append(header, loaderEl, translationEl, sentenceEl, footer);
   stageContainer.appendChild(popup);
 
   let open = false;
@@ -128,10 +141,43 @@ export function createWordPopup(
     wordEl.style.color = style.color;
     translationEl.style.fontSize = `${Math.round(basePx * 0.88)}px`;
     translationEl.style.color = style.color;
+    sentenceEl.style.fontSize = `${Math.round(basePx * 0.78)}px`;
+    sentenceEl.style.color = style.color;
+    loaderEl.style.color = style.color;
     settingsBtn.style.color = style.color;
     settingsBtn.title = t('wordPopupSettings');
 
     positionNearAnchor();
+  }
+
+  function applyData(data: Partial<WordPopupData>): void {
+    if (data.word !== undefined) {
+      wordEl.textContent = data.word;
+    }
+
+    if (data.loading) {
+      loaderEl.style.display = 'block';
+      translationEl.style.display = 'none';
+      sentenceEl.style.display = 'none';
+    } else {
+      loaderEl.style.display = 'none';
+      if (data.error) {
+        translationEl.textContent = data.error;
+        translationEl.style.display = 'block';
+        translationEl.style.opacity = '0.7';
+        sentenceEl.style.display = 'none';
+      } else {
+        if (data.translation !== undefined) {
+          translationEl.textContent = data.translation;
+          translationEl.style.display = data.translation ? 'block' : 'none';
+          translationEl.style.opacity = '1';
+        }
+        if (data.sentenceTranslation !== undefined) {
+          sentenceEl.textContent = data.sentenceTranslation;
+          sentenceEl.style.display = data.sentenceTranslation ? 'block' : 'none';
+        }
+      }
+    }
   }
 
   function show(data: WordPopupData, anchorWordEl?: HTMLElement): void {
@@ -140,12 +186,17 @@ export function createWordPopup(
       currentAnchor = anchorWordEl;
     }
 
-    wordEl.textContent = data.word;
-    translationEl.textContent = data.translation;
+    applyData(data);
     settingsBtn.title = t('wordPopupSettings');
 
     popup.style.display = 'flex';
     syncStyle(currentStyle);
+  }
+
+  function update(patch: Partial<WordPopupData>): void {
+    if (!open) return;
+    applyData(patch);
+    positionNearAnchor();
   }
 
   function hide(): void {
@@ -179,6 +230,7 @@ export function createWordPopup(
   return {
     element: popup,
     show,
+    update,
     hide,
     isOpen: () => open,
     syncStyle,

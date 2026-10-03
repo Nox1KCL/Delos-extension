@@ -33,13 +33,36 @@ export interface VideoTimeSyncMsg {
   playbackRate: number;
 }
 
+export interface SetWindowFullscreenMsg {
+  type: 'DELOS_SET_WINDOW_FULLSCREEN';
+  fullscreen: boolean;
+}
+
+export interface TranslateWordMsg {
+  type: 'DELOS_TRANSLATE_WORD';
+  requestedWord: string;
+  fullSentence: string;
+  targetLanguage: string;
+}
+
+export interface TranslateWordResponse {
+  success: boolean;
+  requestedWord?: string;
+  translatedWord?: string;
+  fullSentence?: string;
+  translatedSentence?: string;
+  error?: string;
+}
+
 export type ToBackgroundMsg =
   | GetStatusMsg
   | ToggleMsg
   | OpenOptionsMsg
   | CaptureStoppedMsg
   | SubtitleMsg
-  | VideoTimeSyncMsg;
+  | VideoTimeSyncMsg
+  | SetWindowFullscreenMsg
+  | TranslateWordMsg;
 
 export interface StartCaptureMsg {
   type: 'OFFSCREEN_START_CAPTURE';
@@ -64,6 +87,22 @@ export type ToOffscreenMsg = StartCaptureMsg | StopCaptureMsg | VideoTimeSyncMsg
 export interface StateChangedMsg {
   type: 'DELOS_STATE_CHANGED';
   active: boolean;
+}
+
+export interface TranscriptEvent {
+  text: string;
+  is_final?: boolean;
+  isFinal?: boolean;
+  start_sec?: number;
+  end_sec?: number;
+  startSec?: number;
+  endSec?: number;
+  duration?: number;
+}
+
+export interface LoadCachedTimelineMsg {
+  type: 'DELOS_LOAD_CACHED_TIMELINE';
+  timeline: TranscriptEvent[];
 }
 
 export interface GetVideoInfoMsg {

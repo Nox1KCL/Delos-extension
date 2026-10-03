@@ -3,7 +3,7 @@ class PcmProcessor extends AudioWorkletProcessor {
     super();
     this._ratio = sampleRate / 16000;
     this._counter = 0;
-    this._chunkSize = 3200;
+    this._chunkSize = 1600;
     this._buffer = new Float32Array(this._chunkSize);
     this._offset = 0;
     this._rmsSum = 0;

@@ -17,9 +17,9 @@ export const BLACKLISTED_PATH_PREFIXES: readonly string[] = [
 ] as const;
 
 export const VIDEO_CONSTRAINTS = {
-  MIN_DURATION_SEC: 60,
-  MIN_WIDTH_PX:     200,
-  MIN_HEIGHT_PX:    120,
+  MIN_DURATION_SEC: 1,
+  MIN_WIDTH_PX:     100,
+  MIN_HEIGHT_PX:    60,
 } as const;
 
 export const STORAGE_KEYS = {
@@ -45,7 +45,7 @@ export const SUBTITLE_DEFAULTS = {
   bgColor:    '#141416',
   bgOpacity:  75,
   position:   'bottom' as 'top' | 'bottom',
-  offset:     8,
+  offset:     14,
   align:      'center' as 'left' | 'center' | 'right',
 } as const;
 
@@ -55,11 +55,13 @@ export const DEFAULT_UI_LANGUAGE = 'en' as 'en' | 'uk';
 export const DEFAULT_THEME = 'dark' as 'dark' | 'light';
 
 export const BACKEND_WS_URL = 'ws://localhost:8080/delos/api/v1/audio/dg';
+export const BACKEND_TRANSLATE_URL = 'http://localhost:8080/delos/api/v1/translate';
+export const BACKEND_CACHE_URL = 'http://localhost:8080/delos/api/v1/audio/cache';
 
 export const VAD = {
-  RMS_THRESHOLD:         0.008,
-  HANGOVER_MS:           800,
-  SILENCE_DISCONNECT_MS: 4000,
+  RMS_THRESHOLD:         0.0015,
+  HANGOVER_MS:           1500,
+  SILENCE_DISCONNECT_MS: 30000,
 } as const;
 
 export const MSG = {
@@ -71,6 +73,9 @@ export const MSG = {
   STOP_CAPTURE:    'OFFSCREEN_STOP_CAPTURE',
   CAPTURE_STOPPED: 'OFFSCREEN_CAPTURE_STOPPED',
   GET_VIDEO_INFO:  'GET_VIDEO_INFO',
-  VIDEO_TIME_SYNC: 'DELOS_VIDEO_TIME_SYNC',
-  SUBTITLE:        'DELOS_SUBTITLE',
+  VIDEO_TIME_SYNC:       'DELOS_VIDEO_TIME_SYNC',
+  SUBTITLE:              'DELOS_SUBTITLE',
+  SET_WINDOW_FULLSCREEN: 'DELOS_SET_WINDOW_FULLSCREEN',
+  TRANSLATE_WORD:        'DELOS_TRANSLATE_WORD',
+  LOAD_CACHED_TIMELINE:  'DELOS_LOAD_CACHED_TIMELINE',
 } as const;

@@ -1,4 +1,6 @@
 import {
+  BACKEND_CACHE_URL,
+  BACKEND_TRANSLATE_URL,
   BACKEND_WS_URL,
   BLACKLISTED_HOSTS,
   BLACKLISTED_PATH_PREFIXES,
@@ -7,6 +9,7 @@ import {
   MSG,
   STORAGE_KEYS,
 } from '../shared/constants';
+import { normalizeVideoUrl } from '../shared/utils';
 import type {
   StartCaptureMsg,
   StatusResponse,
@@ -14,6 +17,9 @@ import type {
   SubtitleMsg,
   ToBackgroundMsg,
   ToggleResponse,
+  TranscriptEvent,
+  TranslateWordMsg,
+  TranslateWordResponse,
   VideoInfoResponse,
 } from '../shared/types';
 
@@ -185,6 +191,47 @@ async function getVideoInfo(tabId: number): Promise<VideoInfoResponse | null> {
   }
 }
 
+async function computeEpisodeHash(
+  url: string,
+  duration: number,
+  language: string
+): Promise<string> {
+  const cleanUrl = normalizeVideoUrl(url);
+  const combined = `${cleanUrl}_${duration.toFixed(2)}_${language}`;
+  const buf = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(combined)
+  );
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+async function checkSubtitleCache(
+  videoUrl: string,
+  duration: number,
+  language: string
+): Promise<TranscriptEvent[] | null> {
+  try {
+    const hash = await computeEpisodeHash(videoUrl, duration, language);
+    const resp = await fetch(
+      `${BACKEND_CACHE_URL}?hash=${encodeURIComponent(hash)}&language=${encodeURIComponent(language)}`
+    );
+    if (!resp.ok) {
+      return null;
+    }
+    const data = await resp.json();
+    const timeline = data?.Timeline || data?.timeline;
+    if (Array.isArray(timeline) && timeline.length > 0) {
+      return timeline as TranscriptEvent[];
+    }
+    return null;
+  } catch (err) {
+    console.warn('[Delos Background] Failed to check subtitle cache:', err);
+    return null;
+  }
+}
+
 async function startTabAudioCapture(tabId: number): Promise<void> {
   const apiKey = await getApiKey();
   if (!apiKey) throw new Error('No API key');
@@ -193,6 +240,25 @@ async function startTabAudioCapture(tabId: number): Promise<void> {
   const videoInfo = await getVideoInfo(tabId);
 
   if (!videoInfo) throw new Error('No qualifying video found on this tab');
+
+  const cleanVideoUrl = normalizeVideoUrl(videoInfo.url);
+
+  const cachedTimeline = await checkSubtitleCache(
+    cleanVideoUrl,
+    videoInfo.duration,
+    language
+  );
+  if (cachedTimeline && cachedTimeline.length > 0) {
+    console.log(
+      '[Delos Background] Found cached subtitles timeline in DB! Live streaming skipped.',
+      { cues: cachedTimeline.length, url: cleanVideoUrl }
+    );
+    await chrome.tabs.sendMessage(tabId, {
+      type: MSG.LOAD_CACHED_TIMELINE,
+      timeline: cachedTimeline,
+    });
+    return;
+  }
 
   await ensureOffscreenDocument();
   const streamId = await getTabMediaStreamId(tabId);
@@ -204,7 +270,7 @@ async function startTabAudioCapture(tabId: number): Promise<void> {
     tabId,
     apiKey,
     language,
-    videoUrl: videoInfo.url,
+    videoUrl: cleanVideoUrl,
     duration: videoInfo.duration,
     baseTime: videoInfo.currentTime,
     backendWsUrl: BACKEND_WS_URL,
@@ -290,10 +356,53 @@ chrome.runtime.onMessage.addListener(
       return false;
     }
 
+    if (message?.type === MSG.TRANSLATE_WORD) {
+      const translateMsg = message as TranslateWordMsg;
+      handleTranslateWord(translateMsg).then(sendResponse);
+      return true;
+    }
+
     handleMessage(message as ToBackgroundMsg).then(sendResponse);
     return true;
   }
 );
+
+async function handleTranslateWord(
+  msg: TranslateWordMsg
+): Promise<TranslateWordResponse> {
+  try {
+    const resp = await fetch(BACKEND_TRANSLATE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requested_word: msg.requestedWord,
+        full_sentence: msg.fullSentence,
+        target_language: msg.targetLanguage,
+      }),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.warn('[Delos Background] Translation failed:', resp.status, errText);
+      return { success: false, error: errText || `HTTP ${resp.status}` };
+    }
+
+    const data = await resp.json();
+    return {
+      success: true,
+      requestedWord: data.requested_word ?? msg.requestedWord,
+      translatedWord: data.translated_word ?? '',
+      fullSentence: data.full_sentence ?? msg.fullSentence,
+      translatedSentence: data.translated_sentence ?? '',
+    };
+  } catch (err) {
+    console.error('[Delos Background] Translation fetch error:', err);
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
 
 async function handleMessage(
   message: ToBackgroundMsg
@@ -385,6 +494,30 @@ async function handleMessage(
 
   if (message.type === MSG.OPEN_OPTIONS) {
     chrome.runtime.openOptionsPage();
+    return { success: true };
+  }
+
+  if (message.type === MSG.SET_WINDOW_FULLSCREEN) {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab?.windowId) {
+        const win = await chrome.windows.get(tab.windowId);
+        if (message.fullscreen) {
+          if (win.state !== 'fullscreen') {
+            await chrome.storage.session.set({ prevWindowState: win.state || 'normal' });
+            await chrome.windows.update(tab.windowId, { state: 'fullscreen' });
+          }
+        } else {
+          if (win.state === 'fullscreen') {
+            const data = await chrome.storage.session.get('prevWindowState');
+            const targetState = (data.prevWindowState === 'minimized' ? 'normal' : data.prevWindowState) || 'normal';
+            await chrome.windows.update(tab.windowId, { state: targetState });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Delos Background] Failed to toggle window fullscreen:', err);
+    }
     return { success: true };
   }
 

@@ -4,6 +4,7 @@ import {
   BACKEND_WS_URL,
   BLACKLISTED_HOSTS,
   BLACKLISTED_PATH_PREFIXES,
+  DEFAULT_GROQ_MODEL,
   DEFAULT_LANGUAGE,
   DEFAULT_TARGET_LANGUAGE,
   MSG,
@@ -367,10 +368,30 @@ chrome.runtime.onMessage.addListener(
   }
 );
 
+async function getGroqApiKey(): Promise<string> {
+  const data = await chrome.storage.local.get(STORAGE_KEYS.GROQ_API_KEY);
+  return (data[STORAGE_KEYS.GROQ_API_KEY] as string) || '';
+}
+
+async function getGroqModel(): Promise<string> {
+  const data = await chrome.storage.local.get(STORAGE_KEYS.GROQ_MODEL);
+  return (data[STORAGE_KEYS.GROQ_MODEL] as string) || DEFAULT_GROQ_MODEL;
+}
+
 async function handleTranslateWord(
   msg: TranslateWordMsg
 ): Promise<TranslateWordResponse> {
   try {
+    const groqKey = await getGroqApiKey();
+    if (!groqKey) {
+      return {
+        success: false,
+        error: 'Groq API Key missing. Please add it in Delos Settings.',
+      };
+    }
+
+    const groqModel = await getGroqModel();
+
     const resp = await fetch(BACKEND_TRANSLATE_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -378,6 +399,12 @@ async function handleTranslateWord(
         requested_word: msg.requestedWord,
         full_sentence: msg.fullSentence,
         target_language: msg.targetLanguage,
+        api_keys: {
+          groq: groqKey,
+        },
+        models: {
+          groq: groqModel,
+        },
       }),
     });
 

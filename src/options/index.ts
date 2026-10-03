@@ -9,6 +9,7 @@ import {
 import {
   applyUiLocale,
   getLanguageName,
+  onLocaleChange,
   t,
   type UiLocale,
 } from '../shared/i18n';
@@ -177,6 +178,23 @@ const FONT_STACKS: Record<string, string> = {
 const apiKeyInput       = document.getElementById('apiKey')         as HTMLInputElement;
 const apiKeyStatus      = document.getElementById('apiKeyStatus')   as HTMLElement;
 const showKeyBtn        = document.getElementById('showKeyBtn')     as HTMLButtonElement;
+
+const groqApiKeyInput   = document.getElementById('groqApiKey')       as HTMLInputElement;
+const groqApiKeyStatus  = document.getElementById('groqApiKeyStatus') as HTMLElement;
+const showGroqKeyBtn    = document.getElementById('showGroqKeyBtn')   as HTMLButtonElement;
+
+const helpDeepgramBtn    = document.getElementById('helpDeepgramBtn')   as HTMLButtonElement;
+const helpGroqBtn        = document.getElementById('helpGroqBtn')       as HTMLButtonElement;
+const tutorialModal      = document.getElementById('tutorialModal')     as HTMLElement;
+const tutorialTitle      = document.getElementById('tutorialTitle')     as HTMLElement;
+const tutorialStep1      = document.getElementById('tutorialStep1')     as HTMLElement;
+const tutorialStep2      = document.getElementById('tutorialStep2')     as HTMLElement;
+const tutorialStep3      = document.getElementById('tutorialStep3')     as HTMLElement;
+const tutorialStep4      = document.getElementById('tutorialStep4')     as HTMLElement;
+const tutorialLink       = document.getElementById('tutorialLink')      as HTMLAnchorElement;
+const tutorialActionText = document.getElementById('tutorialActionText') as HTMLElement;
+const closeTutorialBtn   = document.getElementById('closeTutorialBtn')  as HTMLButtonElement;
+
 const languageSel       = document.getElementById('language')       as HTMLSelectElement;
 const targetLanguageSel = document.getElementById('targetLanguage') as HTMLSelectElement;
 const resetBtn          = document.getElementById('resetBtn')       as HTMLButtonElement;
@@ -230,6 +248,16 @@ function updateSwatchesActive(targetId: string, hexValue: string): void {
   container.querySelectorAll<HTMLButtonElement>('.swatch-btn').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.color?.toLowerCase() === hexValue.toLowerCase());
   });
+}
+
+function isValidDeepgramKey(k: string): boolean {
+  const clean = k.trim();
+  return clean.length >= 32 && clean.length <= 64 && /^[a-zA-Z0-9_-]+$/.test(clean);
+}
+
+function isValidGroqKey(k: string): boolean {
+  const clean = k.trim();
+  return clean.startsWith('gsk_') && clean.length >= 30 && clean.length <= 80 && /^gsk_[a-zA-Z0-9_-]+$/.test(clean);
 }
 
 function resolveWordTranslation(sample: SampleSentence, rawToken: string): { word: string; translation: string } {
@@ -335,9 +363,33 @@ function updatePreview(): void {
   bgOpacityVal.textContent = String(bgOpacity);
   offsetVal.textContent    = String(offset);
 
-  const hasKey = apiKeyInput.value.trim().length > 0;
-  apiKeyStatus.textContent = hasKey ? t('apiKeyActive') : t('apiKeyMissing');
-  apiKeyStatus.classList.toggle('ok', hasKey);
+  const rawDeepgram = apiKeyInput.value.trim();
+  if (rawDeepgram.length === 0) {
+    apiKeyStatus.textContent = t('apiKeyMissing');
+    apiKeyStatus.classList.remove('ok', 'invalid');
+  } else if (!isValidDeepgramKey(rawDeepgram)) {
+    apiKeyStatus.textContent = t('keyInvalid');
+    apiKeyStatus.classList.remove('ok');
+    apiKeyStatus.classList.add('invalid');
+  } else {
+    apiKeyStatus.textContent = t('apiKeyActive');
+    apiKeyStatus.classList.remove('invalid');
+    apiKeyStatus.classList.add('ok');
+  }
+
+  const rawGroq = groqApiKeyInput.value.trim();
+  if (rawGroq.length === 0) {
+    groqApiKeyStatus.textContent = t('groqApiKeyMissing');
+    groqApiKeyStatus.classList.remove('ok', 'invalid');
+  } else if (!isValidGroqKey(rawGroq)) {
+    groqApiKeyStatus.textContent = t('keyInvalid');
+    groqApiKeyStatus.classList.remove('ok');
+    groqApiKeyStatus.classList.add('invalid');
+  } else {
+    groqApiKeyStatus.textContent = t('groqApiKeyActive');
+    groqApiKeyStatus.classList.remove('invalid');
+    groqApiKeyStatus.classList.add('ok');
+  }
 }
 
 previewStage.addEventListener('click', () => {
@@ -359,6 +411,7 @@ async function loadSettings(): Promise<void> {
     applyTheme(savedTheme);
 
     apiKeyInput.value       = (result[STORAGE_KEYS.API_KEY] as string) || '';
+    groqApiKeyInput.value   = (result[STORAGE_KEYS.GROQ_API_KEY] as string) || '';
     languageSel.value       = (result[STORAGE_KEYS.LANGUAGE] as string) || DEFAULT_LANGUAGE;
     targetLanguageSel.value = (result[STORAGE_KEYS.TARGET_LANGUAGE] as string) || DEFAULT_TARGET_LANGUAGE;
 
@@ -386,6 +439,7 @@ async function persistSettings(): Promise<void> {
 
   await storageSet({
     [STORAGE_KEYS.API_KEY]:              apiKeyInput.value.trim(),
+    [STORAGE_KEYS.GROQ_API_KEY]:         groqApiKeyInput.value.trim(),
     [STORAGE_KEYS.LANGUAGE]:             languageSel.value,
     [STORAGE_KEYS.TARGET_LANGUAGE]:      targetLanguageSel.value,
     [STORAGE_KEYS.UI_LANGUAGE]:          uiLocale,
@@ -433,7 +487,62 @@ showKeyBtn.addEventListener('click', () => {
   apiKeyInput.type = apiKeyInput.type === 'password' ? 'text' : 'password';
 });
 
+showGroqKeyBtn.addEventListener('click', () => {
+  groqApiKeyInput.type = groqApiKeyInput.type === 'password' ? 'text' : 'password';
+});
+
 apiKeyInput.addEventListener('input', scheduleAutoSave);
+groqApiKeyInput.addEventListener('input', scheduleAutoSave);
+
+function openTutorial(type: 'deepgram' | 'groq'): void {
+  if (type === 'deepgram') {
+    tutorialTitle.textContent = t('tutorialDeepgramTitle');
+    tutorialStep1.textContent = t('tutorialDeepgramStep1');
+    tutorialStep2.textContent = t('tutorialDeepgramStep2');
+    tutorialStep3.textContent = t('tutorialDeepgramStep3');
+    tutorialStep4.textContent = t('tutorialDeepgramStep4');
+    tutorialLink.href = 'https://console.deepgram.com';
+    tutorialActionText.textContent = 'console.deepgram.com';
+  } else {
+    tutorialTitle.textContent = t('tutorialGroqTitle');
+    tutorialStep1.textContent = t('tutorialGroqStep1');
+    tutorialStep2.textContent = t('tutorialGroqStep2');
+    tutorialStep3.textContent = t('tutorialGroqStep3');
+    tutorialStep4.textContent = t('tutorialGroqStep4');
+    tutorialLink.href = 'https://console.groq.com/keys';
+    tutorialActionText.textContent = 'console.groq.com/keys';
+  }
+  tutorialModal.style.display = 'flex';
+}
+
+function closeTutorial(): void {
+  tutorialModal.style.display = 'none';
+}
+
+helpDeepgramBtn?.addEventListener('click', (e) => {
+  e.preventDefault();
+  openTutorial('deepgram');
+});
+
+helpGroqBtn?.addEventListener('click', (e) => {
+  e.preventDefault();
+  openTutorial('groq');
+});
+
+closeTutorialBtn?.addEventListener('click', closeTutorial);
+
+tutorialModal?.addEventListener('click', (e) => {
+  if (e.target === tutorialModal) {
+    closeTutorial();
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && tutorialModal && tutorialModal.style.display !== 'none') {
+    closeTutorial();
+  }
+});
+
 languageSel.addEventListener('change', scheduleAutoSave);
 targetLanguageSel.addEventListener('change', scheduleAutoSave);
 
@@ -509,6 +618,10 @@ resetBtn.addEventListener('click', () => {
 });
 
 window.addEventListener('resize', () => {
+  updatePreview();
+});
+
+onLocaleChange(() => {
   updatePreview();
 });
 

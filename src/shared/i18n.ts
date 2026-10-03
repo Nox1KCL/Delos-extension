@@ -30,6 +30,7 @@ const en = {
   apiKeyShowHide: 'Show or hide key',
   apiKeyActive: 'Key active',
   apiKeyMissing: 'No key',
+  keyInvalid: 'Invalid format',
 
   videoLangLabel: 'Video language',
   translateToLabel: 'Translate to',
@@ -77,6 +78,26 @@ const en = {
   popupNoVideo: 'No video found (refresh tab or play video)',
   popupCaptureFailed: 'Capture failed (refresh tab)',
   popupOpenSettings: 'Settings',
+
+  groqApiKeyLabel: 'Groq API Key',
+  groqApiKeyPlaceholder: 'Paste key gsk_...',
+  groqApiKeyShowHide: 'Show or hide Groq key',
+  groqApiKeyActive: 'Key active',
+  groqApiKeyMissing: 'No key',
+  helpKeyTitle: 'How to get free key?',
+  tutorialModalTitle: 'How to get free API Key',
+  tutorialDeepgramTitle: 'How to get free Deepgram Key',
+  tutorialDeepgramStep1: 'Go to console.deepgram.com and sign up with Google or GitHub.',
+  tutorialDeepgramStep2: 'Deepgram automatically gives you $200 in free credits.',
+  tutorialDeepgramStep3: 'Navigate to "API Keys" -> click "Create a New API Key".',
+  tutorialDeepgramStep4: 'Copy the key and paste it into the field.',
+  tutorialGroqTitle: 'How to get free Groq Key',
+  tutorialGroqStep1: 'Go to console.groq.com/keys and sign in with Google or GitHub.',
+  tutorialGroqStep2: 'Click the "Create API Key" button and name it (e.g. Delos).',
+  tutorialGroqStep3: 'Copy the generated key (starts with gsk_...) — it is completely free.',
+  tutorialGroqStep4: 'Paste the key into the Groq field for instant translations.',
+  tutorialOpenWebsite: 'Open Website ↗',
+  tutorialClose: 'Close',
 };
 
 export type TranslationKey = keyof typeof en;
@@ -91,6 +112,7 @@ const uk: TranslationDict = {
   apiKeyShowHide: 'Показати або сховати ключ',
   apiKeyActive: 'Ключ є',
   apiKeyMissing: 'Немає ключа',
+  keyInvalid: 'Невірний формат',
 
   videoLangLabel: 'Мова відео',
   translateToLabel: 'Мова перекладу',
@@ -138,6 +160,26 @@ const uk: TranslationDict = {
   popupNoVideo: 'Відео не знайдено (онови вкладку або увімкни відео)',
   popupCaptureFailed: 'Помилка захоплення (онови вкладку)',
   popupOpenSettings: 'Налаштування',
+
+  groqApiKeyLabel: 'API ключ Groq',
+  groqApiKeyPlaceholder: 'Встав ключ gsk_...',
+  groqApiKeyShowHide: 'Показати або сховати ключ Groq',
+  groqApiKeyActive: 'Ключ є',
+  groqApiKeyMissing: 'Немає ключа',
+  helpKeyTitle: 'Як отримати безкоштовний ключ?',
+  tutorialModalTitle: 'Як отримати безкоштовний API ключ',
+  tutorialDeepgramTitle: 'Як отримати безкоштовний ключ Deepgram',
+  tutorialDeepgramStep1: 'Перейди на console.deepgram.com та увійди через Google або GitHub.',
+  tutorialDeepgramStep2: 'Deepgram автоматично нараховує $200 безкоштовних кредитів.',
+  tutorialDeepgramStep3: 'Перейди у розділ "API Keys" -> натисни "Create a New API Key".',
+  tutorialDeepgramStep4: 'Скопіюй ключ і встав його у відповідне поле.',
+  tutorialGroqTitle: 'Як отримати безкоштовний ключ Groq',
+  tutorialGroqStep1: 'Перейди на console.groq.com/keys та увійди через Google або GitHub.',
+  tutorialGroqStep2: 'Натисни кнопку "Create API Key" і вкажи будь-яку назву (наприклад, Delos).',
+  tutorialGroqStep3: 'Скопіюй створений ключ (починається на gsk_...) — це на 100% безкоштовно.',
+  tutorialGroqStep4: 'Встав ключ у поле Groq для миттєвого перекладу.',
+  tutorialOpenWebsite: 'Відкрити сайт ↗',
+  tutorialClose: 'Закрити',
 };
 
 export const TRANSLATIONS: Record<UiLocale, TranslationDict> = {

@@ -178,18 +178,101 @@ function getTabMediaStreamId(tabId: number): Promise<string> {
   });
 }
 
-async function getVideoInfo(tabId: number): Promise<VideoInfoResponse | null> {
-  try {
-    const response = await chrome.tabs.sendMessage(tabId, {
-      type: MSG.GET_VIDEO_INFO,
-    });
-    if (response?.url && response?.duration > 0) {
-      return response as VideoInfoResponse;
-    }
-    return null;
-  } catch {
-    return null;
+const tabVideoFrames = new Map<number, number>();
+
+function sendToTabFrames(tabId: number, message: unknown): void {
+  const targetFrameId = tabVideoFrames.get(tabId);
+  if (typeof targetFrameId === 'number' && targetFrameId !== 0) {
+    chrome.tabs.sendMessage(tabId, message, { frameId: targetFrameId }).catch(() => {});
   }
+  chrome.tabs.sendMessage(tabId, message, { frameId: 0 }).catch(() => {});
+}
+
+async function getVideoInfo(tabId: number): Promise<VideoInfoResponse | null> {
+  let canonicalUrl = '';
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    canonicalUrl = tab?.url || '';
+  } catch {}
+
+  // 1. If we already tracked a specific frame for this tab, query that frame first
+  const knownFrameId = tabVideoFrames.get(tabId);
+  if (typeof knownFrameId === 'number') {
+    try {
+      const response = await chrome.tabs.sendMessage(
+        tabId,
+        { type: MSG.GET_VIDEO_INFO },
+        { frameId: knownFrameId }
+      );
+      if (response?.duration > 0) {
+        return {
+          url: canonicalUrl || response.url,
+          duration: response.duration,
+          currentTime: response.currentTime || 0,
+        };
+      }
+    } catch {}
+  }
+
+  // 2. Query top frame (frame 0)
+  try {
+    const response = await chrome.tabs.sendMessage(
+      tabId,
+      { type: MSG.GET_VIDEO_INFO },
+      { frameId: 0 }
+    );
+    if (response?.duration > 0) {
+      tabVideoFrames.set(tabId, 0);
+      return {
+        url: canonicalUrl || response.url,
+        duration: response.duration,
+        currentTime: response.currentTime || 0,
+      };
+    }
+  } catch {}
+
+  // 3. Fallback: inspect all frames using chrome.scripting.executeScript
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId, allFrames: true },
+      func: () => {
+        const videos = Array.from(document.querySelectorAll('video'));
+        let best: { duration: number; currentTime: number } | null = null;
+        let bestArea = 0;
+        for (const v of videos) {
+          if (Number.isFinite(v.duration) && v.duration > 0 && v.duration < 1) continue;
+          const rect = v.getBoundingClientRect();
+          const w = rect.width || v.offsetWidth || v.videoWidth || 640;
+          const h = rect.height || v.offsetHeight || v.videoHeight || 360;
+          const area = w * h;
+          if (area > bestArea) {
+            bestArea = area;
+            best = {
+              duration: Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 600,
+              currentTime: v.currentTime || 0,
+            };
+          }
+        }
+        return best;
+      },
+    });
+
+    for (const res of results) {
+      if (res.result) {
+        const targetFrameId = res.frameId ?? 0;
+        tabVideoFrames.set(tabId, targetFrameId);
+        return {
+          url: canonicalUrl || '',
+          duration: res.result.duration,
+          currentTime: res.result.currentTime,
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('[Delos Background] Scripting executeScript query failed:', err);
+  }
+
+  return null;
 }
 
 async function computeEpisodeHash(
@@ -249,16 +332,41 @@ async function startTabAudioCapture(tabId: number): Promise<void> {
     videoInfo.duration,
     language
   );
-  if (cachedTimeline && cachedTimeline.length > 0) {
+
+  const maxCachedEnd =
+    cachedTimeline && cachedTimeline.length > 0
+      ? cachedTimeline.reduce((max, ev) => {
+          const end = ev.end_sec ?? ev.endSec ?? 0;
+          return end > max ? end : max;
+        }, 0)
+      : 0;
+
+  // Cache is complete if it covers up to within 90s of video end or 85% of total duration
+  const isCacheComplete =
+    cachedTimeline &&
+    cachedTimeline.length > 0 &&
+    (maxCachedEnd >= videoInfo.duration - 90 || maxCachedEnd >= videoInfo.duration * 0.85);
+
+  if (isCacheComplete) {
     console.log(
-      '[Delos Background] Found cached subtitles timeline in DB! Live streaming skipped.',
-      { cues: cachedTimeline.length, url: cleanVideoUrl }
+      '[Delos Background] Found complete cached subtitles timeline in DB! Live streaming skipped.',
+      { cues: cachedTimeline.length, maxCachedEnd, duration: videoInfo.duration, url: cleanVideoUrl }
     );
-    await chrome.tabs.sendMessage(tabId, {
+    sendToTabFrames(tabId, {
       type: MSG.LOAD_CACHED_TIMELINE,
       timeline: cachedTimeline,
     });
     return;
+  }
+
+  if (cachedTimeline && cachedTimeline.length > 0) {
+    console.log(
+      `[Delos Background] Partial cache found (${cachedTimeline.length} cues, up to ${maxCachedEnd.toFixed(1)}s of ${videoInfo.duration.toFixed(1)}s). Pre-loading cached cues and starting live capture for remaining audio.`
+    );
+    sendToTabFrames(tabId, {
+      type: MSG.LOAD_CACHED_TIMELINE,
+      timeline: cachedTimeline,
+    });
   }
 
   await ensureOffscreenDocument();
@@ -275,6 +383,7 @@ async function startTabAudioCapture(tabId: number): Promise<void> {
     duration: videoInfo.duration,
     baseTime: videoInfo.currentTime,
     backendWsUrl: BACKEND_WS_URL,
+    cachedUpToSec: maxCachedEnd,
   };
 
   const response = await chrome.runtime.sendMessage<
@@ -307,9 +416,7 @@ async function stopTabAudioCapture(): Promise<void> {
 }
 
 function notifyTabStateChanged(tabId: number, active: boolean): void {
-  chrome.tabs
-    .sendMessage(tabId, { type: MSG.STATE_CHANGED, active })
-    .catch(() => {});
+  sendToTabFrames(tabId, { type: MSG.STATE_CHANGED, active });
 }
 
 async function deactivateCurrentTab(): Promise<void> {
@@ -324,25 +431,27 @@ async function deactivateCurrentTab(): Promise<void> {
 chrome.runtime.onMessage.addListener(
   (
     message: (ToBackgroundMsg | SubtitleMsg) & { target?: string },
-    _sender,
+    sender,
     sendResponse: (r: StatusResponse | ToggleResponse | { success: boolean }) => void
   ) => {
     if (message?.target === 'offscreen') {
       return false;
     }
 
+    if (sender?.tab?.id && typeof sender.frameId === 'number') {
+      tabVideoFrames.set(sender.tab.id, sender.frameId);
+    }
+
     if (message?.type === MSG.SUBTITLE) {
       const subMsg = message as SubtitleMsg;
       if (subMsg.tabId > 0) {
-        chrome.tabs
-          .sendMessage(subMsg.tabId, {
-            type: MSG.SUBTITLE,
-            text: subMsg.text,
-            startSec: subMsg.startSec,
-            endSec: subMsg.endSec,
-            isFinal: subMsg.isFinal,
-          })
-          .catch(() => {});
+        sendToTabFrames(subMsg.tabId, {
+          type: MSG.SUBTITLE,
+          text: subMsg.text,
+          startSec: subMsg.startSec,
+          endSec: subMsg.endSec,
+          isFinal: subMsg.isFinal,
+        });
       }
       return false;
     }
@@ -375,7 +484,11 @@ async function getGroqApiKey(): Promise<string> {
 
 async function getGroqModel(): Promise<string> {
   const data = await chrome.storage.local.get(STORAGE_KEYS.GROQ_MODEL);
-  return (data[STORAGE_KEYS.GROQ_MODEL] as string) || DEFAULT_GROQ_MODEL;
+  const stored = (data[STORAGE_KEYS.GROQ_MODEL] as string) || '';
+  if (!stored || stored === 'openai/gpt-oss-20b') {
+    return DEFAULT_GROQ_MODEL;
+  }
+  return stored;
 }
 
 async function handleTranslateWord(
@@ -411,7 +524,11 @@ async function handleTranslateWord(
     if (!resp.ok) {
       const errText = await resp.text();
       console.warn('[Delos Background] Translation failed:', resp.status, errText);
-      return { success: false, error: errText || `HTTP ${resp.status}` };
+      const friendlyErr =
+        resp.status === 404 || errText.includes("result wasn't gotten")
+          ? 'Translation unavailable (LLM service error)'
+          : errText || `HTTP ${resp.status}`;
+      return { success: false, error: friendlyErr };
     }
 
     const data = await resp.json();
@@ -556,6 +673,7 @@ chrome.tabs.onActivated.addListener(({ tabId }) => {
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
+  tabVideoFrames.delete(tabId);
   void (async () => {
     const activeTabId = await getActiveTabId();
     if (activeTabId === tabId) {
@@ -566,6 +684,9 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'loading') {
+    tabVideoFrames.delete(tabId);
+  }
   void (async () => {
     const activeTabId = await getActiveTabId();
     if (activeTabId !== tabId) {

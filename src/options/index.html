@@ -4,8 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title data-i18n="pageTitle">Delos – Settings</title>
-  <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png" />
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png?v=2" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png?v=2" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-128.png?v=2" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Montserrat:wght@400;500;600&family=Open+Sans:wght@400;500;600&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
@@ -37,7 +39,7 @@
 
     .top-bar {
       display: grid;
-      grid-template-columns: auto minmax(180px, 1.2fr) minmax(180px, 1.2fr) minmax(120px, 0.7fr) minmax(120px, 0.7fr) auto auto auto;
+      grid-template-columns: minmax(210px, 1.4fr) minmax(210px, 1.4fr) minmax(130px, 0.8fr) minmax(130px, 0.8fr) auto auto auto;
       gap: 10px;
       align-items: stretch;
     }
@@ -177,34 +179,32 @@
     }
 
     .label-with-help {
-      display: flex;
+      display: inline-flex;
       align-items: center;
       gap: 6px;
+      line-height: 1;
     }
 
     .help-circle-btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 17px;
-      height: 17px;
-      border-radius: 50%;
-      border: 1.5px solid #ff4d4f;
-      color: #ff4d4f;
-      background: transparent;
-      font-size: 11px;
-      font-weight: 700;
-      line-height: 1;
-      cursor: pointer;
+      background: none;
+      border: none;
       padding: 0;
-      transition: all 0.15s ease;
+      color: #ff4d4f;
+      cursor: pointer;
+      line-height: 1;
       flex-shrink: 0;
+      transition: transform 0.15s ease, filter 0.15s ease;
+      vertical-align: middle;
+    }
+    .help-circle-btn svg {
+      display: block;
     }
     .help-circle-btn:hover {
-      background: #ff4d4f;
-      color: #ffffff;
-      transform: scale(1.08);
-      box-shadow: 0 0 8px rgba(255, 77, 79, 0.45);
+      transform: scale(1.15);
+      filter: drop-shadow(0 0 5px rgba(255, 77, 79, 0.65));
     }
 
     /* Tutorial Modal */
@@ -322,7 +322,7 @@
     }
     .tutorial-action-btn:hover {
       filter: brightness(1.15);
-      border-color: var(--brand-gold);
+      border-color: var(--brand-sand);
     }
 
     .actions-module {
@@ -350,7 +350,7 @@
       width: 7px;
       height: 7px;
       border-radius: 50%;
-      background-color: var(--brand-gold);
+      background-color: var(--brand-sand);
     }
 
     .save-status.saved {
@@ -412,8 +412,8 @@
       width: 6px;
       height: 14px;
       border-radius: 2px;
-      background-color: var(--brand-gold);
-      border: 1px solid var(--brand-burgundy);
+      background-color: var(--brand-sand);
+      border: 1px solid var(--brand-teal);
     }
 
     .panel-title {
@@ -530,8 +530,8 @@
       width: 15px;
       height: 15px;
       border-radius: 4px;
-      background-color: var(--brand-gold);
-      border: 2px solid var(--brand-burgundy);
+      background-color: var(--brand-sand);
+      border: 2px solid var(--brand-teal);
       cursor: pointer;
     }
 
@@ -539,8 +539,8 @@
       width: 15px;
       height: 15px;
       border-radius: 4px;
-      background-color: var(--brand-gold);
-      border: 2px solid var(--brand-burgundy);
+      background-color: var(--brand-sand);
+      border: 2px solid var(--brand-teal);
       cursor: pointer;
     }
 
@@ -715,22 +715,19 @@
 <body>
   <div class="app-shell">
     <header class="top-bar">
-      <div class="top-module brand-module">
-        <img class="brand-logo" src="/icons/icon-128.png" alt="Delos" />
-        <div class="brand-text">
-          <span class="brand-name">DELOS</span>
-          <span class="brand-sub" data-i18n="brandSub">Subtitles & translation</span>
-        </div>
-      </div>
-
       <div class="top-module">
         <div class="top-field">
           <div class="top-field-header">
             <div class="label-with-help">
               <label class="module-label" for="apiKey" data-i18n="apiKeyLabel">Deepgram API Key</label>
-              <button class="help-circle-btn" id="helpDeepgramBtn" type="button" data-i18n-title="helpKeyTitle" title="How to get free key?">?</button>
+              <button class="help-circle-btn" id="helpDeepgramBtn" type="button" data-i18n-title="helpKeyTitle" title="How to get free key?">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="6.75" stroke="currentColor" stroke-width="1.3" fill="currentColor" fill-opacity="0.14"/>
+                  <path d="M6 6.1a2 2 0 0 1 3.4-1.4c.5.5.7 1.1.5 1.7-.3 1-1.9 1.4-1.9 2.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                  <circle cx="8" cy="11.8" r="0.85" fill="currentColor"/>
+                </svg>
+              </button>
             </div>
-            <a class="external-link" href="https://console.deepgram.com" target="_blank" rel="noopener noreferrer">console.deepgram.com ↗</a>
           </div>
           <div class="key-input-group">
             <div class="key-wrapper">
@@ -759,9 +756,14 @@
           <div class="top-field-header">
             <div class="label-with-help">
               <label class="module-label" for="groqApiKey" data-i18n="groqApiKeyLabel">Groq API Key</label>
-              <button class="help-circle-btn" id="helpGroqBtn" type="button" data-i18n-title="helpKeyTitle" title="How to get free key?">?</button>
+              <button class="help-circle-btn" id="helpGroqBtn" type="button" data-i18n-title="helpKeyTitle" title="How to get free key?">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="6.75" stroke="currentColor" stroke-width="1.3" fill="currentColor" fill-opacity="0.14"/>
+                  <path d="M6 6.1a2 2 0 0 1 3.4-1.4c.5.5.7 1.1.5 1.7-.3 1-1.9 1.4-1.9 2.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                  <circle cx="8" cy="11.8" r="0.85" fill="currentColor"/>
+                </svg>
+              </button>
             </div>
-            <a class="external-link" href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">console.groq.com ↗</a>
           </div>
           <div class="key-input-group">
             <div class="key-wrapper">
@@ -910,7 +912,7 @@
               <input type="text" class="color-hex-input" id="subColorHex" value="#FFFFFF" maxlength="7" spellcheck="false" />
               <div class="color-swatches" data-target="subColor">
                 <button type="button" class="swatch-btn" data-color="#ffffff" style="background:#ffffff" title="#FFFFFF"></button>
-                <button type="button" class="swatch-btn" data-color="#e5be77" style="background:#e5be77" title="#E5BE77"></button>
+                <button type="button" class="swatch-btn" data-color="#e8d5b5" style="background:#e8d5b5" title="#E8D5B5"></button>
                 <button type="button" class="swatch-btn" data-color="#f5e6c8" style="background:#f5e6c8" title="#F5E6C8"></button>
                 <button type="button" class="swatch-btn" data-color="#a7f3d0" style="background:#a7f3d0" title="#A7F3D0"></button>
               </div>
@@ -927,7 +929,7 @@
               <div class="color-swatches" data-target="subBgColor">
                 <button type="button" class="swatch-btn" data-color="#000000" style="background:#000000" title="#000000"></button>
                 <button type="button" class="swatch-btn" data-color="#141416" style="background:#141416" title="#141416"></button>
-                <button type="button" class="swatch-btn" data-color="#3b1533" style="background:#3b1533" title="#3B1533"></button>
+                <button type="button" class="swatch-btn" data-color="#0e3b43" style="background:#0e3b43" title="#0E3B43"></button>
                 <button type="button" class="swatch-btn" data-color="#262320" style="background:#262320" title="#262320"></button>
               </div>
             </div>
@@ -995,9 +997,9 @@
               <rect width="640" height="360" fill="#151418"/>
               <polygon points="0,360 230,170 430,360" fill="#1C1A21"/>
               <polygon points="210,360 440,145 640,360" fill="#231D27"/>
-              <circle cx="150" cy="105" r="28" fill="#3B1533"/>
-              <rect x="292" y="142" width="56" height="56" rx="14" fill="#241923" stroke="#3B1533" stroke-width="2"/>
-              <polygon points="314,160 332,170 314,180" fill="#E5BE77"/>
+              <circle cx="150" cy="105" r="28" fill="#0E3B43"/>
+              <rect x="292" y="142" width="56" height="56" rx="14" fill="#0f262c" stroke="#0E3B43" stroke-width="2"/>
+              <polygon points="314,160 332,170 314,180" fill="#E8D5B5"/>
             </svg>
 
             <div class="preview-overlay" id="previewOverlay">

@@ -58,6 +58,8 @@
         "*://*.tiktok.com/*",
         "*://www.youtube.com/shorts/*"
       ],
+      "all_frames": true,
+      "match_about_blank": true,
       "js": ["src/content/index.ts"],
       "run_at": "document_idle"
     }

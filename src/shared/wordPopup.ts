@@ -36,6 +36,121 @@ function hexToRgba(hexColor: string, opacityPercent: number): string {
   return `rgba(${r}, ${g}, ${b}, ${effectiveOpacity})`;
 }
 
+function renderSentenceWithHighlight(
+  container: HTMLElement,
+  sentence: string,
+  wordTranslation?: string
+): void {
+  container.innerHTML = '';
+  const trimmedSentence = (sentence || '').trim();
+  if (!trimmedSentence) {
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = 'block';
+
+  if (!wordTranslation || !wordTranslation.trim()) {
+    container.textContent = trimmedSentence;
+    return;
+  }
+
+  // 1. Extract candidates from wordTranslation (e.g. "повинен, мушу" -> ["повинен, мушу", "повинен", "мушу"])
+  const rawCandidates: string[] = [];
+  const cleanFull = wordTranslation.trim().replace(/[.,!?;:«»"']/g, '').trim();
+  if (cleanFull) rawCandidates.push(cleanFull);
+
+  wordTranslation
+    .split(/[,;/()]/)
+    .map((s) => s.replace(/[.,!?;:«»"']/g, '').trim())
+    .filter((s) => s.length >= 2)
+    .forEach((s) => {
+      if (!rawCandidates.includes(s)) rawCandidates.push(s);
+    });
+
+  const extraWords: string[] = [];
+  for (const c of rawCandidates) {
+    c.split(/\s+/).forEach((w) => {
+      const cw = w.trim();
+      if (cw.length >= 3 && !rawCandidates.includes(cw) && !extraWords.includes(cw)) {
+        extraWords.push(cw);
+      }
+    });
+  }
+  rawCandidates.push(...extraWords);
+  rawCandidates.sort((a, b) => b.length - a.length);
+
+  // 2. Try exact or whole-word substring match
+  const lowerSentence = trimmedSentence.toLowerCase();
+  let bestMatch: { start: number; end: number } | null = null;
+
+  for (const cand of rawCandidates) {
+    const lowerCand = cand.toLowerCase();
+    let searchFrom = 0;
+    while (searchFrom < lowerSentence.length) {
+      const idx = lowerSentence.indexOf(lowerCand, searchFrom);
+      if (idx === -1) break;
+      const end = idx + lowerCand.length;
+
+      const isStartWord = idx === 0 || !/\p{L}/u.test(trimmedSentence[idx - 1]);
+      const isEndWord = end === trimmedSentence.length || !/\p{L}/u.test(trimmedSentence[end]);
+
+      if (isStartWord && isEndWord) {
+        bestMatch = { start: idx, end };
+        break;
+      }
+      searchFrom = idx + 1;
+    }
+    if (bestMatch) break;
+  }
+
+  // 3. Fallback: stem / inflection matching (e.g. "повинен" -> "повинна", "робити" -> "робив")
+  if (!bestMatch) {
+    const wordMatches = Array.from(trimmedSentence.matchAll(/\p{L}+/gu));
+    for (const cand of rawCandidates) {
+      const lowerCand = cand.toLowerCase();
+      const stemLength = Math.max(3, Math.min(lowerCand.length, Math.floor(lowerCand.length * 0.75)));
+      const stem = lowerCand.slice(0, stemLength);
+
+      for (const m of wordMatches) {
+        const sentenceWord = m[0];
+        const lowerSW = sentenceWord.toLowerCase();
+        const mIndex = m.index ?? 0;
+
+        if (
+          (lowerSW.startsWith(stem) || lowerCand.startsWith(lowerSW.slice(0, stemLength))) &&
+          Math.abs(lowerSW.length - lowerCand.length) <= 3
+        ) {
+          bestMatch = { start: mIndex, end: mIndex + sentenceWord.length };
+          break;
+        }
+      }
+      if (bestMatch) break;
+    }
+  }
+
+  // 4. Render with highlight if match found
+  if (bestMatch) {
+    const beforeText = trimmedSentence.slice(0, bestMatch.start);
+    const highlightedText = trimmedSentence.slice(bestMatch.start, bestMatch.end);
+    const afterText = trimmedSentence.slice(bestMatch.end);
+
+    if (beforeText) {
+      container.appendChild(document.createTextNode(beforeText));
+    }
+
+    const highlightSpan = document.createElement('span');
+    highlightSpan.className = 'delos-word-popup__highlight';
+    highlightSpan.textContent = highlightedText;
+    container.appendChild(highlightSpan);
+
+    if (afterText) {
+      container.appendChild(document.createTextNode(afterText));
+    }
+  } else {
+    container.textContent = trimmedSentence;
+  }
+}
+
 export function createWordPopup(
   stageContainer: HTMLElement,
   onOpenSettings?: () => void
@@ -134,21 +249,18 @@ export function createWordPopup(
 
     const basePx = Math.max(11, Math.min(26, style.fontSize));
     popup.style.fontFamily = style.fontFamily;
-    popup.style.color = style.color;
     popup.style.backgroundColor = hexToRgba(style.bgColor, style.bgOpacity);
 
-    wordEl.style.fontSize = `${Math.round(basePx * 0.92)}px`;
-    wordEl.style.color = style.color;
+    wordEl.style.fontSize = `${Math.round(basePx * 0.95)}px`;
     translationEl.style.fontSize = `${Math.round(basePx * 0.88)}px`;
-    translationEl.style.color = style.color;
     sentenceEl.style.fontSize = `${Math.round(basePx * 0.78)}px`;
-    sentenceEl.style.color = style.color;
-    loaderEl.style.color = style.color;
-    settingsBtn.style.color = style.color;
     settingsBtn.title = t('wordPopupSettings');
 
     positionNearAnchor();
   }
+
+  let currentTranslation = '';
+  let currentSentence = '';
 
   function applyData(data: Partial<WordPopupData>): void {
     if (data.word !== undefined) {
@@ -162,19 +274,32 @@ export function createWordPopup(
     } else {
       loaderEl.style.display = 'none';
       if (data.error) {
-        translationEl.textContent = data.error;
+        translationEl.textContent = 'Translation unavailable';
         translationEl.style.display = 'block';
-        translationEl.style.opacity = '0.7';
-        sentenceEl.style.display = 'none';
+        translationEl.style.opacity = '0.9';
+        translationEl.style.color = '#f87171';
+        sentenceEl.textContent = data.error;
+        sentenceEl.style.display = 'block';
+        sentenceEl.style.opacity = '0.75';
+        sentenceEl.style.fontSize = '11px';
       } else {
+        translationEl.style.color = '';
+        sentenceEl.style.opacity = '';
         if (data.translation !== undefined) {
+          currentTranslation = data.translation;
           translationEl.textContent = data.translation;
           translationEl.style.display = data.translation ? 'block' : 'none';
           translationEl.style.opacity = '1';
         }
         if (data.sentenceTranslation !== undefined) {
-          sentenceEl.textContent = data.sentenceTranslation;
-          sentenceEl.style.display = data.sentenceTranslation ? 'block' : 'none';
+          currentSentence = data.sentenceTranslation;
+        }
+
+        if (currentSentence) {
+          renderSentenceWithHighlight(sentenceEl, currentSentence, currentTranslation);
+        } else {
+          sentenceEl.style.display = 'none';
+          sentenceEl.innerHTML = '';
         }
       }
     }
@@ -185,6 +310,9 @@ export function createWordPopup(
     if (anchorWordEl) {
       currentAnchor = anchorWordEl;
     }
+
+    currentTranslation = data.translation ?? '';
+    currentSentence = data.sentenceTranslation ?? '';
 
     applyData(data);
     settingsBtn.title = t('wordPopupSettings');
@@ -202,6 +330,8 @@ export function createWordPopup(
   function hide(): void {
     open = false;
     popup.style.display = 'none';
+    currentTranslation = '';
+    currentSentence = '';
     stageContainer
       .querySelectorAll('.delos-sub-word.selected')
       .forEach((el) => el.classList.remove('selected'));

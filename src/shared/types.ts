@@ -75,6 +75,7 @@ export interface StartCaptureMsg {
   duration: number;
   baseTime: number;
   backendWsUrl: string;
+  cachedUpToSec?: number;
 }
 
 export interface StopCaptureMsg {

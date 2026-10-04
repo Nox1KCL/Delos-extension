@@ -55,7 +55,7 @@ export const DEFAULT_LANGUAGE = 'en';
 export const DEFAULT_TARGET_LANGUAGE = 'uk';
 export const DEFAULT_UI_LANGUAGE = 'en' as 'en' | 'uk';
 export const DEFAULT_THEME = 'dark' as 'dark' | 'light';
-export const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-20b';
+export const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 export const BACKEND_WS_URL = 'ws://localhost:8080/delos/api/v1/audio/dg';
 export const BACKEND_TRANSLATE_URL = 'http://localhost:8080/delos/api/v1/translate';

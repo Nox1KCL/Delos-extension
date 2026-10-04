@@ -8,11 +8,6 @@ import { BLACKLISTED_PATH_PREFIXES, MSG, VIDEO_CONSTRAINTS } from '../shared/con
 import { normalizeVideoUrl } from '../shared/utils';
 import { SubtitleOverlay } from './overlay';
 
-if (window !== window.top) {
-  // Only run in the top-level window (never inside ad or widget iframes)
-  throw new Error('[Delos] Subframe injection skipped');
-}
-
 let isDelosEnabled = false;
 let activeVideo: HTMLVideoElement | null = null;
 let domObserver: MutationObserver | null = null;
@@ -20,7 +15,7 @@ let cachedTimeline: TranscriptEvent[] = [];
 let currentCueIndex = -1;
 const overlay = new SubtitleOverlay();
 
-console.log('[Delos Content] Injected on', window.location.href);
+console.log('[Delos Content] Injected on', window.location.href, window === window.top ? '(top window)' : '(iframe)');
 
 function isQualifyingVideo(video: HTMLVideoElement): boolean {
   if (
@@ -37,9 +32,11 @@ function isQualifyingVideo(video: HTMLVideoElement): boolean {
   }
 
   const rect = video.getBoundingClientRect();
+  const width = rect.width || video.offsetWidth || video.videoWidth || 0;
+  const height = rect.height || video.offsetHeight || video.videoHeight || 0;
   if (
-    (rect.width > 0 && rect.width < VIDEO_CONSTRAINTS.MIN_WIDTH_PX) ||
-    (rect.height > 0 && rect.height < VIDEO_CONSTRAINTS.MIN_HEIGHT_PX)
+    (width > 0 && width < VIDEO_CONSTRAINTS.MIN_WIDTH_PX) ||
+    (height > 0 && height < VIDEO_CONSTRAINTS.MIN_HEIGHT_PX)
   ) {
     return false;
   }
@@ -55,7 +52,9 @@ function findMainVideo(): HTMLVideoElement | null {
   for (const video of videos) {
     if (!isQualifyingVideo(video)) continue;
     const rect = video.getBoundingClientRect();
-    const area = (rect.width || 640) * (rect.height || 360);
+    const w = rect.width || video.offsetWidth || video.videoWidth || 640;
+    const h = rect.height || video.offsetHeight || video.videoHeight || 360;
+    const area = w * h;
     if (area > bestArea) {
       bestArea = area;
       best = video;
@@ -262,8 +261,9 @@ chrome.runtime.onMessage.addListener(
       console.log('[Delos Content] Query video:', video ? { duration: video.duration, currentTime: video.currentTime } : 'no qualifying video');
       if (video) {
         const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 600;
+        const pageUrl = window.top === window ? window.location.href : (document.referrer || window.location.href);
         sendResponse({
-          url: normalizeVideoUrl(window.location.href),
+          url: normalizeVideoUrl(pageUrl),
           duration,
           currentTime: video.currentTime || 0,
         });

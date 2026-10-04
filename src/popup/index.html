@@ -95,6 +95,7 @@
       background-color: var(--status-warn-bg);
       border: 1px solid var(--status-warn-border);
       color: var(--status-warn-text);
+      cursor: pointer;
     }
 
     .status-dot {
@@ -172,33 +173,6 @@
       cursor: not-allowed;
       background-color: var(--bg-page);
     }
-
-    .settings-link {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 12px;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-main);
-      cursor: pointer;
-      border: 1px solid var(--border-main);
-      background-color: var(--bg-panel);
-      width: 100%;
-      border-radius: 6px;
-    }
-
-    .settings-link-left {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .settings-link:hover {
-      background-color: var(--accent-bg);
-      color: var(--accent-text);
-      border-color: var(--accent-border);
-    }
   </style>
 </head>
 <body>
@@ -236,24 +210,6 @@
         <span class="slider"></span>
       </label>
     </div>
-
-    <button class="settings-link" id="settingsLink">
-      <span class="settings-link-left">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="4" y1="21" x2="4" y2="14"/>
-          <line x1="4" y1="10" x2="4" y2="3"/>
-          <line x1="12" y1="21" x2="12" y2="12"/>
-          <line x1="12" y1="8" x2="12" y2="3"/>
-          <line x1="20" y1="21" x2="20" y2="16"/>
-          <line x1="20" y1="12" x2="20" y2="3"/>
-          <line x1="1" y1="14" x2="7" y2="14"/>
-          <line x1="9" y1="8" x2="15" y2="8"/>
-          <line x1="17" y1="16" x2="23" y2="16"/>
-        </svg>
-        <span data-i18n="popupOpenSettings">Settings & subtitles</span>
-      </span>
-      <span>→</span>
-    </button>
   </div>
 
   <script type="module" src="index.ts"></script>

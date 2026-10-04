@@ -180,6 +180,10 @@ export class SubtitleOverlay {
   private getBestPlayerContainer(video: HTMLVideoElement): HTMLElement {
     const ytPlayer = video.closest<HTMLElement>('#movie_player');
     if (ytPlayer) return ytPlayer;
+    const jwPlayer = video.closest<HTMLElement>('.jwplayer, #player, #playerbase, .jw-media');
+    if (jwPlayer) return jwPlayer;
+    const genericPlayer = video.closest<HTMLElement>('.video-js, .plyr, .vjs-tech, [class*="player"]');
+    if (genericPlayer) return genericPlayer;
     return video.parentElement || (document.body as HTMLElement);
   }
 
@@ -197,6 +201,11 @@ export class SubtitleOverlay {
       const compPos = window.getComputedStyle(this.playerContainer).position;
       if (compPos === 'static') {
         this.playerContainer.style.position = 'relative';
+      }
+    } else if (this.playerContainer === document.body) {
+      const compPos = window.getComputedStyle(document.body).position;
+      if (compPos === 'static') {
+        document.body.style.position = 'relative';
       }
     }
 
@@ -225,6 +234,13 @@ export class SubtitleOverlay {
 
     this.cueWrapperEl.appendChild(this.prevBoxEl);
     this.cueWrapperEl.appendChild(this.currBoxEl);
+    this.cueWrapperEl.addEventListener('click', (e) => {
+      const target = (e.target as HTMLElement)?.closest<HTMLElement>('.delos-sub-word');
+      if (target && this.cueWrapperEl?.contains(target)) {
+        e.stopPropagation();
+        this.onWordClicked(target);
+      }
+    });
     this.stageEl.appendChild(this.cueWrapperEl);
     this.shadowRoot.appendChild(this.stageEl);
 
@@ -497,7 +513,7 @@ export class SubtitleOverlay {
     this.currentEndSec = endSec;
 
     // Update words via DOM-diffing in-place (no full innerHTML wipe)
-    this.renderWords(text, this.currBoxEl);
+    this.renderWords(text, this.currBoxEl, startSec, endSec);
     this.currBoxEl.classList.remove('hidden', 'delos-fading');
 
     // Keep active while speech is streaming
@@ -525,7 +541,7 @@ export class SubtitleOverlay {
     this.isCurrentCommitted = true;
     this.lastCueRenderTime = Date.now();
 
-    this.renderWords(text, this.currBoxEl);
+    this.renderWords(text, this.currBoxEl, startSec, endSec);
     this.currBoxEl.classList.remove('hidden', 'delos-fading');
 
     // Auto-hide when silence follows: minimum 2.6s, +280ms per word (up to 4.2s max)
@@ -546,7 +562,12 @@ export class SubtitleOverlay {
 
     this.previousCue = this.currentCue;
     this.prevBoxEl.innerHTML = '';
-    this.renderWords(this.previousCue.text, this.prevBoxEl);
+    this.renderWords(
+      this.previousCue.text,
+      this.prevBoxEl,
+      this.previousCue.startSec,
+      this.previousCue.endSec
+    );
     this.prevBoxEl.classList.remove('hidden', 'delos-fading');
     this.prevBoxEl.classList.add('delos-promoting');
 
@@ -621,9 +642,12 @@ export class SubtitleOverlay {
    * Smart DOM diffing: updates or appends words without destroying already rendered elements.
    * Newly appended words animate smoothly, while existing words stay rock-solid in DOM.
    */
-  private renderWords(sentence: string, container: HTMLElement): void {
+  private renderWords(sentence: string, container: HTMLElement, startSec = 0, endSec = 0): void {
     const tokens = sentence.split(/\s+/).filter(Boolean);
     const existingSpans = Array.from(container.querySelectorAll<HTMLElement>('.delos-sub-word'));
+
+    // Split multi-sentence cue into per-token individual sentences
+    const tokenSentences = this.mapTokensToSentences(tokens);
 
     // 1. Update matching prefix spans or reuse them without re-creating DOM nodes
     const minLen = Math.min(tokens.length, existingSpans.length);
@@ -632,12 +656,12 @@ export class SubtitleOverlay {
       const span = existingSpans[i];
       if (span.textContent !== token) {
         span.textContent = token;
-        const cleanWord = token.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
-        span.dataset.word = cleanWord || token;
-        span.dataset.sentence = this.currentSentence;
-        span.dataset.start = String(this.currentStartSec);
-        span.dataset.end = String(this.currentEndSec);
       }
+      const cleanWord = token.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+      span.dataset.word = cleanWord || token;
+      span.dataset.sentence = tokenSentences[i] || sentence;
+      span.dataset.start = String(startSec);
+      span.dataset.end = String(endSec);
     }
 
     // 2. If tokens shrank, remove excess spans and their space text nodes
@@ -666,21 +690,43 @@ export class SubtitleOverlay {
 
         const cleanWord = token.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
         span.dataset.word = cleanWord || token;
-        span.dataset.sentence = this.currentSentence;
-        span.dataset.start = String(this.currentStartSec);
-        span.dataset.end = String(this.currentEndSec);
-
-        span.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.onWordClicked(token, span);
-        });
+        span.dataset.sentence = tokenSentences[i] || sentence;
+        span.dataset.start = String(startSec);
+        span.dataset.end = String(endSec);
 
         container.appendChild(span);
       }
     }
   }
 
-  private async onWordClicked(word: string, element: HTMLElement): Promise<void> {
+  private mapTokensToSentences(tokens: string[]): string[] {
+    if (tokens.length === 0) return [];
+    const sentenceList: string[][] = [];
+    let currentGroup: string[] = [];
+    const abbrevs = new Set(['mr.', 'mrs.', 'ms.', 'dr.', 'prof.', 'sr.', 'jr.', 'vs.', 'e.g.', 'i.e.', 'etc.']);
+
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+      currentGroup.push(token);
+      const lower = token.toLowerCase().trim();
+      const isTerminator = /[.!?]$/.test(lower) && !abbrevs.has(lower);
+      if (isTerminator || i === tokens.length - 1) {
+        sentenceList.push(currentGroup);
+        currentGroup = [];
+      }
+    }
+
+    const tokenSentenceMap: string[] = [];
+    for (const group of sentenceList) {
+      const fullSentence = group.join(' ');
+      for (let j = 0; j < group.length; j++) {
+        tokenSentenceMap.push(fullSentence);
+      }
+    }
+    return tokenSentenceMap;
+  }
+
+  private async onWordClicked(element: HTMLElement): Promise<void> {
     if (this.activeVideo && !this.activeVideo.paused) {
       this.activeVideo.pause();
     }
@@ -694,9 +740,10 @@ export class SubtitleOverlay {
 
     if (!this.popupController) return;
 
-    const cleanWord = word.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '').trim();
-    const targetWord = cleanWord || word.trim();
-    const sentence = element.dataset.sentence || this.currentSentence || targetWord;
+    const rawWord = element.dataset.word || element.textContent || '';
+    const cleanWord = rawWord.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '').trim();
+    const targetWord = cleanWord || rawWord.trim();
+    const sentence = (element.dataset.sentence || targetWord).trim();
 
     if (!targetWord) return;
 
@@ -884,6 +931,8 @@ export class SubtitleOverlay {
         white-space: pre-wrap;
         word-break: break-word;
         text-align: center;
+        max-height: calc(var(--delos-font-size, 20px) * 1.45 * 3.2);
+        overflow: hidden;
         pointer-events: none;
         opacity: 1;
         transform: translateY(0);
@@ -948,14 +997,14 @@ export class SubtitleOverlay {
       }
 
       .delos-sub-word:hover {
-        background-color: rgba(229, 190, 119, 0.28);
+        background-color: rgba(232, 213, 181, 0.28);
         outline: 1px solid var(--delos-color, #ffffff);
       }
 
       .delos-sub-word.selected {
-        background-color: rgba(229, 190, 119, 0.45);
+        background-color: rgba(232, 213, 181, 0.45);
         color: #ffffff;
-        outline: 1px solid #e5be77;
+        outline: 1px solid #e8d5b5;
       }
 
       /* Word Popup Inside Shadow DOM */
@@ -965,7 +1014,7 @@ export class SubtitleOverlay {
         min-width: 170px;
         max-width: 280px;
         background: var(--delos-bg-computed, rgba(20, 20, 22, 0.95));
-        border: 1px solid #e5be77;
+        border: 1px solid #e8d5b5;
         border-radius: 8px;
         padding: 8px 12px;
         display: flex;
@@ -985,12 +1034,12 @@ export class SubtitleOverlay {
         justify-content: space-between;
         gap: 8px;
         padding-bottom: 4px;
-        border-bottom: 1px solid rgba(229, 190, 119, 0.3);
+        border-bottom: 1px solid rgba(232, 213, 181, 0.3);
       }
 
       .delos-word-popup__word {
         font-weight: 600;
-        color: #e5be77;
+        color: #e8d5b5;
         font-size: 15px;
       }
 
@@ -1024,15 +1073,28 @@ export class SubtitleOverlay {
         line-height: 1.35;
         font-size: 12px;
         padding-top: 4px;
-        border-top: 1px dashed rgba(229, 190, 119, 0.25);
+        border-top: 1px dashed rgba(232, 213, 181, 0.25);
         font-style: italic;
+      }
+
+      .delos-word-popup__highlight {
+        font-weight: 600;
+        font-style: normal;
+        border-radius: 3px;
+        padding: 1px 4px;
+        margin: 0 1px;
+        display: inline-block;
+        line-height: 1.25;
+        background-color: rgba(232, 213, 181, 0.25);
+        color: inherit;
+        outline: 1px solid rgba(232, 213, 181, 0.55);
       }
 
       .delos-word-popup__loader {
         font-weight: 600;
         font-size: 16px;
         letter-spacing: 2px;
-        color: #e5be77;
+        color: #e8d5b5;
         animation: delosPulse 1.2s infinite ease-in-out;
         padding: 2px 0;
       }
@@ -1061,7 +1123,7 @@ export class SubtitleOverlay {
       }
 
       .delos-word-popup__settings:hover {
-        color: #e5be77;
+        color: #e8d5b5;
         background: rgba(255, 255, 255, 0.1);
       }
 

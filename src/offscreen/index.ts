@@ -27,6 +27,7 @@ interface CaptureConfig {
   videoUrl: string;
   duration: number;
   backendWsUrl: string;
+  cachedUpToSec?: number;
 }
 
 let config: CaptureConfig | null = null;
@@ -39,8 +40,20 @@ function getCurrentVideoTime(): number {
   return lastKnownVideoTime + elapsedSec * videoPlaybackRate;
 }
 
+function isWithinCachedTerritory(): boolean {
+  if (!config?.cachedUpToSec || config.cachedUpToSec <= 0) return false;
+  return getCurrentVideoTime() < config.cachedUpToSec - 1.0;
+}
+
 function openWs(): void {
   if (ws?.readyState === WebSocket.OPEN || ws?.readyState === WebSocket.CONNECTING) {
+    return;
+  }
+
+  if (isWithinCachedTerritory()) {
+    console.log(
+      `[Delos Offscreen] Current playback time (${getCurrentVideoTime().toFixed(1)}s) is within cached territory (up to ${config?.cachedUpToSec?.toFixed(1)}s). Deferring WebSocket connection.`
+    );
     return;
   }
 
@@ -142,7 +155,10 @@ function clearAllTimers(): void {
 }
 
 function handlePcmChunk(pcm: ArrayBuffer, rms: number): void {
-  if (isVideoPaused) {
+  if (isVideoPaused || isWithinCachedTerritory()) {
+    if (isWithinCachedTerritory() && ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+      closeWs();
+    }
     return;
   }
 
@@ -239,8 +255,14 @@ async function startCapture(
     });
   }
 
-  // Pre-connect WebSocket so handshake is complete before the first word is uttered
-  openWs();
+  // Pre-connect WebSocket if outside cached range
+  if (!isWithinCachedTerritory()) {
+    openWs();
+  } else {
+    console.log(
+      `[Delos Offscreen] Video playback is currently at ${baseTime.toFixed(1)}s, within cached range (up to ${newConfig.cachedUpToSec?.toFixed(1)}s). Deferring WebSocket connection until cache boundary.`
+    );
+  }
 }
 
 async function stopCapture(notifyBackground: boolean): Promise<void> {
@@ -302,6 +324,7 @@ chrome.runtime.onMessage.addListener(
         videoUrl: message.videoUrl,
         duration: message.duration,
         backendWsUrl: message.backendWsUrl || BACKEND_WS_URL,
+        cachedUpToSec: message.cachedUpToSec || 0,
       };
 
       startCapture(message.streamId, message.tabId, message.baseTime, newConfig)
@@ -337,8 +360,8 @@ chrome.runtime.onMessage.addListener(
         closeWs();
       }
 
-      // If capture is active, video is playing, and socket is not open/ready: open it immediately!
-      if (config && !syncMsg.paused && (!ws || ws.readyState === WebSocket.CLOSED)) {
+      // If capture is active, video is playing, socket is not open, and we are past the cached territory: open it!
+      if (config && !syncMsg.paused && !isWithinCachedTerritory() && (!ws || ws.readyState === WebSocket.CLOSED)) {
         openWs();
       }
       return false;

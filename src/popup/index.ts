@@ -13,7 +13,6 @@ const toggleSublabel = document.getElementById('toggleSublabel') as HTMLElement;
 const badgeBlocked   = document.getElementById('badgeBlocked')   as HTMLElement;
 const badgeNoKey     = document.getElementById('badgeNoKey')     as HTMLElement;
 const settingsBtn    = document.getElementById('settingsBtn')    as HTMLButtonElement;
-const settingsLink   = document.getElementById('settingsLink')   as HTMLButtonElement;
 
 let currentTabId = -1;
 
@@ -93,6 +92,6 @@ function openOptions(): void {
 }
 
 settingsBtn.addEventListener('click', openOptions);
-settingsLink.addEventListener('click', openOptions);
+badgeNoKey.addEventListener('click', openOptions);
 
 init();

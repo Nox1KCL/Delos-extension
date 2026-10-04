@@ -49,12 +49,22 @@ async function storageSet(items: Record<string, unknown>): Promise<void> {
 
 interface SampleSentence {
   text: string;
+  sentenceTranslations?: Record<string, string>;
   words: Record<string, Record<string, string>>;
 }
 
 const PREVIEW_SAMPLES: Record<string, SampleSentence> = {
   en: {
     text: 'The dog began to bark at the stranger.',
+    sentenceTranslations: {
+      uk: 'Собака почав гавкати на незнайомця.',
+      en: 'The dog began to bark at the stranger.',
+      de: 'Der Hund begann, den Fremden anzubellen.',
+      fr: "Le chien a commencé à aboyer sur l'inconnu.",
+      es: 'El perro empezó a ladrar al extraño.',
+      it: 'Il cane iniziò ad abbaiare allo sconosciuto.',
+      pl: 'Pies zaczął szczekać na nieznajomego.',
+    },
     words: {
       the: { uk: 'означений артикль', en: 'definite article', de: 'bestimmter Artikel', fr: 'article défini', es: 'artículo definido', pl: 'przedimek określony' },
       dog: { uk: 'собака, пес', en: 'domestic canine', de: 'Hund', fr: 'chien', es: 'perro', it: 'cane', pl: 'pies', pt: 'cão', ja: '犬', ko: '개', zh: '狗' },
@@ -67,6 +77,14 @@ const PREVIEW_SAMPLES: Record<string, SampleSentence> = {
   },
   uk: {
     text: 'Субтитри автоматично підлаштовуються під плеєр.',
+    sentenceTranslations: {
+      en: 'Subtitles automatically adapt to the player.',
+      uk: 'Субтитри автоматично підлаштовуються під плеєр.',
+      de: 'Untertitel passen sich automatisch an den Player an.',
+      pl: 'Napisy автоматично dostosowują się do odtwarzacza.',
+      fr: "Les sous-titres s'adaptent automatiquement au lecteur.",
+      es: 'Los subtítulos se adaptan automáticamente al reproductor.',
+    },
     words: {
       субтитри: { en: 'subtitles, captions', uk: 'текстовий супровід', de: 'Untertitel', pl: 'napisy', fr: 'sous-titres', es: 'subtítulos' },
       автоматично: { en: 'automatically', uk: 'самостійно', de: 'automatisch', pl: 'automatycznie', fr: 'automatiquement', es: 'automáticamente' },
@@ -77,6 +95,11 @@ const PREVIEW_SAMPLES: Record<string, SampleSentence> = {
   },
   de: {
     text: 'Die Geschichte dieser Stadt bleibt ein Rätsel.',
+    sentenceTranslations: {
+      uk: 'Історія цього міста залишається загадкою.',
+      en: 'The history of this city remains a mystery.',
+      de: 'Die Geschichte dieser Stadt bleibt ein Rätsel.',
+    },
     words: {
       geschichte: { uk: 'історія', en: 'history, story', pl: 'historia', fr: 'histoire' },
       dieser: { uk: 'цього, цієї', en: 'of this', pl: 'tego' },
@@ -87,6 +110,11 @@ const PREVIEW_SAMPLES: Record<string, SampleSentence> = {
   },
   fr: {
     text: 'La lumière du soir éclaire doucement la rue.',
+    sentenceTranslations: {
+      uk: 'Вечірнє світло м’яко освітлює вулицю.',
+      en: 'The evening light gently illuminates the street.',
+      fr: 'La lumière du soir éclaire doucement la rue.',
+    },
     words: {
       lumière: { uk: 'світло', en: 'light', de: 'Licht', pl: 'światło' },
       soir: { uk: 'вечір', en: 'evening', de: 'Abend', pl: 'wieczór' },
@@ -97,6 +125,11 @@ const PREVIEW_SAMPLES: Record<string, SampleSentence> = {
   },
   es: {
     text: 'El silencio de la noche revela secretos.',
+    sentenceTranslations: {
+      uk: 'Нічна тиша розкриває таємниці.',
+      en: 'The silence of the night reveals secrets.',
+      es: 'El silencio de la noche revela secretos.',
+    },
     words: {
       silencio: { uk: 'тиша', en: 'silence', de: 'Stille', pl: 'cisza' },
       noche: { uk: 'ніч', en: 'night', de: 'Nacht', pl: 'noc' },
@@ -106,6 +139,11 @@ const PREVIEW_SAMPLES: Record<string, SampleSentence> = {
   },
   it: {
     text: 'Ogni parola racconta una storia diversa.',
+    sentenceTranslations: {
+      uk: 'Кожне слово розповідає іншу історію.',
+      en: 'Every word tells a different story.',
+      it: 'Ogni parola racconta una storia diversa.',
+    },
     words: {
       ogni: { uk: 'кожен, кожне', en: 'every, each' },
       parola: { uk: 'слово', en: 'word' },
@@ -116,6 +154,11 @@ const PREVIEW_SAMPLES: Record<string, SampleSentence> = {
   },
   pl: {
     text: 'Każde nowe słowo możesz łatwo przetłumaczyć.',
+    sentenceTranslations: {
+      uk: 'Кожне нове слово ти можеш легко перекласти.',
+      en: 'You can easily translate every new word.',
+      pl: 'Każde nowe słowo możesz łatwo przetłumaczyć.',
+    },
     words: {
       każde: { uk: 'кожне', en: 'every, each' },
       nowe: { uk: 'нове', en: 'new' },
@@ -127,6 +170,11 @@ const PREVIEW_SAMPLES: Record<string, SampleSentence> = {
   },
   pt: {
     text: 'A tradução ajuda a compreender expressões.',
+    sentenceTranslations: {
+      uk: 'Переклад допомагає розуміти вирази.',
+      en: 'Translation helps to understand expressions.',
+      pt: 'A tradução ajuda a compreender expressões.',
+    },
     words: {
       tradução: { uk: 'переклад', en: 'translation' },
       ajuda: { uk: 'допомагає', en: 'helps' },
@@ -136,6 +184,11 @@ const PREVIEW_SAMPLES: Record<string, SampleSentence> = {
   },
   ja: {
     text: '静かな夜の海には古い物語が隠されている。',
+    sentenceTranslations: {
+      uk: 'У тихому нічному морі прихована давня історія.',
+      en: 'An ancient story is hidden in the quiet night sea.',
+      ja: '静かな夜の海には古い物語が隠されている。',
+    },
     words: {
       '静かな夜の海には古い物語が隠されている。': {
         uk: 'У тихому нічному морі прихована давня історія.',
@@ -145,18 +198,28 @@ const PREVIEW_SAMPLES: Record<string, SampleSentence> = {
   },
   ko: {
     text: '모든 문장은 맥락 속에서 새로운 의미를 가집니다.',
+    sentenceTranslations: {
+      uk: 'Кожне речення в контексті має нове значення.',
+      en: 'Every sentence has a new meaning in context.',
+      ko: '모든 문장은 맥락 속에서 새로운 의미를 가집니다.',
+    },
     words: {
       모든: { uk: 'усі, кожне', en: 'every, all' },
       문장은: { uk: 'речення', en: 'sentence' },
       맥락: { uk: 'контекст', en: 'context' },
       속에서: { uk: 'всередині, у', en: 'within, in' },
       새로운: { uk: 'новий', en: 'new' },
-      의미를: { uk: 'значення', en: 'meaning' },
+      의ми를: { uk: 'значення', en: 'meaning' },
       가집니다: { uk: 'має', en: 'has, holds' },
     },
   },
   zh: {
     text: '每一个词语在语境中都有独特的含义。',
+    sentenceTranslations: {
+      uk: 'Кожне слово в контексті має унікальне значення.',
+      en: 'Every word has a unique meaning in context.',
+      zh: '每一个词语在语境中都有独特的含义。',
+    },
     words: {
       '每一个词语在语境中都有独特的含义。': {
         uk: 'Кожне слово в контексті має своє унікальне значення.',
@@ -260,7 +323,7 @@ function isValidGroqKey(k: string): boolean {
   return clean.startsWith('gsk_') && clean.length >= 30 && clean.length <= 80 && /^gsk_[a-zA-Z0-9_-]+$/.test(clean);
 }
 
-function resolveWordTranslation(sample: SampleSentence, rawToken: string): { word: string; translation: string } {
+function resolveWordTranslation(sample: SampleSentence, rawToken: string): { word: string; translation: string; sentenceTranslation?: string } {
   const trgLang = (targetLanguageSel.value || DEFAULT_TARGET_LANGUAGE).toLowerCase();
   const cleanWord = rawToken.replace(/[.,!?;:«»"']/g, '');
   const key = cleanWord.toLowerCase();
@@ -272,9 +335,15 @@ function resolveWordTranslation(sample: SampleSentence, rawToken: string): { wor
     entry?.en ??
     getLanguageName(trgLang);
 
+  const sentenceTranslation =
+    sample.sentenceTranslations?.[trgLang] ??
+    sample.sentenceTranslations?.uk ??
+    sample.sentenceTranslations?.en;
+
   return {
     word: cleanWord || rawToken,
     translation,
+    sentenceTranslation,
   };
 }
 

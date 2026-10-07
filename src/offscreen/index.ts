@@ -192,7 +192,6 @@ function handlePcmChunk(pcm: ArrayBuffer, rms: number): void {
     }
   }
 
-  // Always send real audio PCM while connected so Deepgram hears all speech nuances and soft words
   if (wsReady && ws?.readyState === WebSocket.OPEN) {
     ws.send(pcm);
   } else if (speechDetected || isSpeaking) {
@@ -255,7 +254,6 @@ async function startCapture(
     });
   }
 
-  // Pre-connect WebSocket if outside cached range
   if (!isWithinCachedTerritory()) {
     openWs();
   } else {
@@ -360,7 +358,6 @@ chrome.runtime.onMessage.addListener(
         closeWs();
       }
 
-      // If capture is active, video is playing, socket is not open, and we are past the cached territory: open it!
       if (config && !syncMsg.paused && !isWithinCachedTerritory() && (!ws || ws.readyState === WebSocket.CLOSED)) {
         openWs();
       }

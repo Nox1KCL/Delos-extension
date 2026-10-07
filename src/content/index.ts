@@ -13,6 +13,9 @@ let activeVideo: HTMLVideoElement | null = null;
 let domObserver: MutationObserver | null = null;
 let cachedTimeline: TranscriptEvent[] = [];
 let currentCueIndex = -1;
+let lastAttachedUrl = '';
+let lastAttachedSrc = '';
+let lastAttachedDuration = 0;
 const overlay = new SubtitleOverlay();
 
 console.log('[Delos Content] Injected on', window.location.href, window === window.top ? '(top window)' : '(iframe)');
@@ -26,7 +29,6 @@ function isQualifyingVideo(video: HTMLVideoElement): boolean {
     return false;
   }
 
-  // Reject only if duration is a finite positive number less than minimum
   if (Number.isFinite(video.duration) && video.duration > 0 && video.duration < VIDEO_CONSTRAINTS.MIN_DURATION_SEC) {
     return false;
   }
@@ -70,6 +72,7 @@ function sendVideoTimeSync(): void {
   if (!activeVideo || !isDelosEnabled) return;
   chrome.runtime.sendMessage({
     type: MSG.VIDEO_TIME_SYNC,
+    target: 'offscreen',
     currentTime: activeVideo.currentTime,
     paused: activeVideo.paused,
     playbackRate: activeVideo.playbackRate || 1,
@@ -119,6 +122,9 @@ function attachToVideo(video: HTMLVideoElement): void {
   if (activeVideo === video) return;
   detachVideo();
   activeVideo = video;
+  lastAttachedUrl = window.location.href;
+  lastAttachedSrc = video.currentSrc || '';
+  lastAttachedDuration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
 
   video.addEventListener('timeupdate', onVideoTimeUpdate);
   video.addEventListener('seeked', onVideoPlaybackEvent);
@@ -128,6 +134,14 @@ function attachToVideo(video: HTMLVideoElement): void {
 
   overlay.attach(video);
   sendVideoTimeSync();
+
+  if (isDelosEnabled && lastAttachedDuration > 0) {
+    chrome.runtime.sendMessage({
+      type: MSG.VIDEO_ATTACHED,
+      url: window.location.href,
+      duration: lastAttachedDuration,
+    }).catch(() => {});
+  }
 }
 
 function detachVideo(): void {
@@ -139,20 +153,45 @@ function detachVideo(): void {
     activeVideo.removeEventListener('ratechange', onVideoPlaybackEvent);
     activeVideo = null;
   }
+  lastAttachedUrl = '';
+  lastAttachedSrc = '';
+  lastAttachedDuration = 0;
   overlay.detach();
 }
 
-function evaluateVideos(): void {
+function evaluateVideos(forceReattach = false): void {
   if (!isDelosEnabled) return;
 
-  // If already tracking a valid video attached to the DOM, do not disturb it
-  if (activeVideo && document.contains(activeVideo)) {
+  const currentUrl = window.location.href;
+  const currentSrc = activeVideo?.currentSrc || '';
+
+  if (
+    !forceReattach &&
+    activeVideo &&
+    document.contains(activeVideo) &&
+    lastAttachedUrl === currentUrl &&
+    lastAttachedSrc === currentSrc
+  ) {
     return;
   }
 
   const candidate = findMainVideo();
   if (candidate) {
-    attachToVideo(candidate);
+    const candidateDuration = Number.isFinite(candidate.duration) && candidate.duration > 0 ? candidate.duration : 0;
+    if (activeVideo !== candidate || lastAttachedUrl !== currentUrl || lastAttachedSrc !== candidate.currentSrc || forceReattach) {
+      detachVideo();
+      cachedTimeline = [];
+      currentCueIndex = -1;
+      overlay.clearSubtitle();
+      attachToVideo(candidate);
+    } else if (lastAttachedDuration === 0 && candidateDuration > 0 && isDelosEnabled) {
+      lastAttachedDuration = candidateDuration;
+      chrome.runtime.sendMessage({
+        type: MSG.VIDEO_ATTACHED,
+        url: window.location.href,
+        duration: candidateDuration,
+      }).catch(() => {});
+    }
   } else if (activeVideo && !document.contains(activeVideo)) {
     detachVideo();
   }
@@ -162,6 +201,10 @@ function onVideoEvent(e: Event): void {
   if (e.target instanceof HTMLVideoElement) {
     evaluateVideos();
   }
+}
+
+function onNavigationChange(): void {
+  evaluateVideos(true);
 }
 
 function onFullscreenChange(): void {
@@ -184,8 +227,8 @@ function startWatchingVideos(): void {
   document.addEventListener('play', onVideoEvent, true);
   document.addEventListener('fullscreenchange', onFullscreenChange);
   document.addEventListener('webkitfullscreenchange', onFullscreenChange);
-  window.addEventListener('yt-navigate-finish', evaluateVideos);
-  window.addEventListener('popstate', evaluateVideos);
+  window.addEventListener('yt-navigate-finish', onNavigationChange);
+  window.addEventListener('popstate', onNavigationChange);
 
   if (!domObserver) {
     domObserver = new MutationObserver(() => {
@@ -206,8 +249,8 @@ function stopWatchingVideos(): void {
   document.removeEventListener('play', onVideoEvent, true);
   document.removeEventListener('fullscreenchange', onFullscreenChange);
   document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
-  window.removeEventListener('yt-navigate-finish', evaluateVideos);
-  window.removeEventListener('popstate', evaluateVideos);
+  window.removeEventListener('yt-navigate-finish', onNavigationChange);
+  window.removeEventListener('popstate', onNavigationChange);
 
   chrome.runtime.sendMessage({
     type: MSG.SET_WINDOW_FULLSCREEN,
@@ -260,7 +303,7 @@ chrome.runtime.onMessage.addListener(
       const video = findMainVideo();
       console.log('[Delos Content] Query video:', video ? { duration: video.duration, currentTime: video.currentTime } : 'no qualifying video');
       if (video) {
-        const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 600;
+        const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
         const pageUrl = window.top === window ? window.location.href : (document.referrer || window.location.href);
         sendResponse({
           url: normalizeVideoUrl(pageUrl),

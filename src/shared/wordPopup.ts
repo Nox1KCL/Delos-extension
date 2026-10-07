@@ -54,7 +54,6 @@ function renderSentenceWithHighlight(
     return;
   }
 
-  // 1. Extract candidates from wordTranslation (e.g. "повинен, мушу" -> ["повинен, мушу", "повинен", "мушу"])
   const rawCandidates: string[] = [];
   const cleanFull = wordTranslation.trim().replace(/[.,!?;:«»"']/g, '').trim();
   if (cleanFull) rawCandidates.push(cleanFull);
@@ -79,7 +78,6 @@ function renderSentenceWithHighlight(
   rawCandidates.push(...extraWords);
   rawCandidates.sort((a, b) => b.length - a.length);
 
-  // 2. Try exact or whole-word substring match
   const lowerSentence = trimmedSentence.toLowerCase();
   let bestMatch: { start: number; end: number } | null = null;
 
@@ -103,7 +101,6 @@ function renderSentenceWithHighlight(
     if (bestMatch) break;
   }
 
-  // 3. Fallback: stem / inflection matching (e.g. "повинен" -> "повинна", "робити" -> "робив")
   if (!bestMatch) {
     const wordMatches = Array.from(trimmedSentence.matchAll(/\p{L}+/gu));
     for (const cand of rawCandidates) {
@@ -128,7 +125,6 @@ function renderSentenceWithHighlight(
     }
   }
 
-  // 4. Render with highlight if match found
   if (bestMatch) {
     const beforeText = trimmedSentence.slice(0, bestMatch.start);
     const highlightedText = trimmedSentence.slice(bestMatch.start, bestMatch.end);

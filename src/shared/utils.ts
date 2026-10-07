@@ -1,13 +1,29 @@
-/**
- * Normalizes video URLs to ensure consistent hashes across different
- * navigation parameters (e.g. YouTube timestamp &t=, playlist &list=, etc.).
- */
+function isIgnoredParam(key: string): boolean {
+  const k = key.toLowerCase();
+  if (k.startsWith('utm_')) return true;
+  const ignored = new Set([
+    't',
+    'time',
+    'start',
+    'timestamp',
+    'ref',
+    'fbclid',
+    'gclid',
+    '_ga',
+    'yclid',
+    'token',
+    'expires',
+    'session',
+    'signature',
+  ]);
+  return ignored.has(k);
+}
+
 export function normalizeVideoUrl(rawUrl: string): string {
   try {
     const u = new URL(rawUrl);
     const host = u.hostname.toLowerCase();
 
-    // YouTube main video URLs (www.youtube.com, youtube.com, m.youtube.com)
     if (
       host === 'www.youtube.com' ||
       host === 'youtube.com' ||
@@ -19,7 +35,6 @@ export function normalizeVideoUrl(rawUrl: string): string {
       }
     }
 
-    // YouTube short links (youtu.be/ID)
     if (host === 'youtu.be') {
       const videoId = u.pathname.replace(/^\/+/, '');
       if (videoId) {
@@ -27,9 +42,21 @@ export function normalizeVideoUrl(rawUrl: string): string {
       }
     }
 
-    // For other video streaming services (Netflix, anime portals, etc.),
-    // strip query parameters and hash fragments that vary by session/timestamp
-    return `${u.origin}${u.pathname}`;
+    const keysToDelete: string[] = [];
+    u.searchParams.forEach((_, key) => {
+      if (isIgnoredParam(key)) {
+        keysToDelete.push(key);
+      }
+    });
+    for (const key of keysToDelete) {
+      u.searchParams.delete(key);
+    }
+
+    u.searchParams.sort();
+    u.hash = '';
+    const cleanPath = u.pathname.replace(/\/+$/, '') || '/';
+    const query = u.searchParams.toString();
+    return `${u.origin}${cleanPath}${query ? `?${query}` : ''}`;
   } catch {
     return rawUrl;
   }

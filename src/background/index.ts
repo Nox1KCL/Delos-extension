@@ -21,6 +21,7 @@ import type {
   TranscriptEvent,
   TranslateWordMsg,
   TranslateWordResponse,
+  VideoAttachedMsg,
   VideoInfoResponse,
 } from '../shared/types';
 
@@ -42,6 +43,12 @@ const INACTIVE_ICON_PATHS: Record<string, string> = {
 };
 
 let creatingOffscreenPromise: Promise<void> | null = null;
+let currentCaptureSession: {
+  tabId: number;
+  url: string;
+  duration: number;
+} | null = null;
+let isStartingCapture = false;
 
 function isBlacklisted(url: string): boolean {
   try {
@@ -195,7 +202,6 @@ async function getVideoInfo(tabId: number): Promise<VideoInfoResponse | null> {
     canonicalUrl = tab?.url || '';
   } catch {}
 
-  // 1. If we already tracked a specific frame for this tab, query that frame first
   const knownFrameId = tabVideoFrames.get(tabId);
   if (typeof knownFrameId === 'number') {
     try {
@@ -214,7 +220,6 @@ async function getVideoInfo(tabId: number): Promise<VideoInfoResponse | null> {
     } catch {}
   }
 
-  // 2. Query top frame (frame 0)
   try {
     const response = await chrome.tabs.sendMessage(
       tabId,
@@ -231,7 +236,6 @@ async function getVideoInfo(tabId: number): Promise<VideoInfoResponse | null> {
     }
   } catch {}
 
-  // 3. Fallback: inspect all frames using chrome.scripting.executeScript
   try {
     const results = await chrome.scripting.executeScript({
       target: { tabId, allFrames: true },
@@ -248,7 +252,7 @@ async function getVideoInfo(tabId: number): Promise<VideoInfoResponse | null> {
           if (area > bestArea) {
             bestArea = area;
             best = {
-              duration: Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 600,
+              duration: Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 0,
               currentTime: v.currentTime || 0,
             };
           }
@@ -281,7 +285,8 @@ async function computeEpisodeHash(
   language: string
 ): Promise<string> {
   const cleanUrl = normalizeVideoUrl(url);
-  const combined = `${cleanUrl}_${duration.toFixed(2)}_${language}`;
+  const roundedSec = Math.round(duration);
+  const combined = `${cleanUrl}_${roundedSec}_${language}`;
   const buf = await crypto.subtle.digest(
     'SHA-256',
     new TextEncoder().encode(combined)
@@ -316,87 +321,112 @@ async function checkSubtitleCache(
   }
 }
 
-async function startTabAudioCapture(tabId: number): Promise<void> {
-  const apiKey = await getApiKey();
-  if (!apiKey) throw new Error('No API key');
-
-  const language = await getLanguage();
-  const videoInfo = await getVideoInfo(tabId);
-
-  if (!videoInfo) throw new Error('No qualifying video found on this tab');
-
-  const cleanVideoUrl = normalizeVideoUrl(videoInfo.url);
-
-  const cachedTimeline = await checkSubtitleCache(
-    cleanVideoUrl,
-    videoInfo.duration,
-    language
-  );
-
-  const maxCachedEnd =
-    cachedTimeline && cachedTimeline.length > 0
-      ? cachedTimeline.reduce((max, ev) => {
-          const end = ev.end_sec ?? ev.endSec ?? 0;
-          return end > max ? end : max;
-        }, 0)
-      : 0;
-
-  // Cache is complete if it covers up to within 90s of video end or 85% of total duration
-  const isCacheComplete =
-    cachedTimeline &&
-    cachedTimeline.length > 0 &&
-    (maxCachedEnd >= videoInfo.duration - 90 || maxCachedEnd >= videoInfo.duration * 0.85);
-
-  if (isCacheComplete) {
-    console.log(
-      '[Delos Background] Found complete cached subtitles timeline in DB! Live streaming skipped.',
-      { cues: cachedTimeline.length, maxCachedEnd, duration: videoInfo.duration, url: cleanVideoUrl }
-    );
-    sendToTabFrames(tabId, {
-      type: MSG.LOAD_CACHED_TIMELINE,
-      timeline: cachedTimeline,
-    });
+async function startTabAudioCapture(
+  tabId: number,
+  fallbackInfo?: { url: string; duration: number }
+): Promise<void> {
+  if (isStartingCapture) {
     return;
   }
+  isStartingCapture = true;
 
-  if (cachedTimeline && cachedTimeline.length > 0) {
-    console.log(
-      `[Delos Background] Partial cache found (${cachedTimeline.length} cues, up to ${maxCachedEnd.toFixed(1)}s of ${videoInfo.duration.toFixed(1)}s). Pre-loading cached cues and starting live capture for remaining audio.`
+  try {
+    const apiKey = await getApiKey();
+    if (!apiKey) throw new Error('No API key');
+
+    const language = await getLanguage();
+    let videoInfo = await getVideoInfo(tabId);
+
+    if (!videoInfo && fallbackInfo && fallbackInfo.duration > 0) {
+      videoInfo = {
+        url: fallbackInfo.url,
+        duration: fallbackInfo.duration,
+        currentTime: 0,
+      };
+    }
+
+    if (!videoInfo) throw new Error('No qualifying video found on this tab');
+
+    const cleanVideoUrl = normalizeVideoUrl(videoInfo.url);
+    currentCaptureSession = {
+      tabId,
+      url: cleanVideoUrl,
+      duration: videoInfo.duration,
+    };
+
+    const cachedTimeline = await checkSubtitleCache(
+      cleanVideoUrl,
+      videoInfo.duration,
+      language
     );
-    sendToTabFrames(tabId, {
-      type: MSG.LOAD_CACHED_TIMELINE,
-      timeline: cachedTimeline,
-    });
-  }
 
-  await ensureOffscreenDocument();
-  const streamId = await getTabMediaStreamId(tabId);
+    const maxCachedEnd =
+      cachedTimeline && cachedTimeline.length > 0
+        ? cachedTimeline.reduce((max, ev) => {
+            const end = ev.end_sec ?? ev.endSec ?? 0;
+            return end > max ? end : max;
+          }, 0)
+        : 0;
 
-  const msg: StartCaptureMsg = {
-    type: MSG.START_CAPTURE,
-    target: 'offscreen',
-    streamId,
-    tabId,
-    apiKey,
-    language,
-    videoUrl: cleanVideoUrl,
-    duration: videoInfo.duration,
-    baseTime: videoInfo.currentTime,
-    backendWsUrl: BACKEND_WS_URL,
-    cachedUpToSec: maxCachedEnd,
-  };
+    const isCacheComplete =
+      cachedTimeline &&
+      cachedTimeline.length > 0 &&
+      (maxCachedEnd >= videoInfo.duration - 90 || maxCachedEnd >= videoInfo.duration * 0.85);
 
-  const response = await chrome.runtime.sendMessage<
-    StartCaptureMsg,
-    { success: boolean; error?: string }
-  >(msg);
+    if (isCacheComplete) {
+      console.log(
+        '[Delos Background] Found complete cached subtitles timeline in DB! Live streaming skipped.',
+        { cues: cachedTimeline.length, maxCachedEnd, duration: videoInfo.duration, url: cleanVideoUrl }
+      );
+      sendToTabFrames(tabId, {
+        type: MSG.LOAD_CACHED_TIMELINE,
+        timeline: cachedTimeline,
+      });
+      return;
+    }
 
-  if (!response?.success) {
-    throw new Error(response?.error || 'Offscreen capture failed to start');
+    if (cachedTimeline && cachedTimeline.length > 0) {
+      console.log(
+        `[Delos Background] Partial cache found (${cachedTimeline.length} cues, up to ${maxCachedEnd.toFixed(1)}s of ${videoInfo.duration.toFixed(1)}s). Pre-loading cached cues and starting live capture for remaining audio.`
+      );
+      sendToTabFrames(tabId, {
+        type: MSG.LOAD_CACHED_TIMELINE,
+        timeline: cachedTimeline,
+      });
+    }
+
+    await ensureOffscreenDocument();
+    const streamId = await getTabMediaStreamId(tabId);
+
+    const msg: StartCaptureMsg = {
+      type: MSG.START_CAPTURE,
+      target: 'offscreen',
+      streamId,
+      tabId,
+      apiKey,
+      language,
+      videoUrl: cleanVideoUrl,
+      duration: videoInfo.duration,
+      baseTime: videoInfo.currentTime,
+      backendWsUrl: BACKEND_WS_URL,
+      cachedUpToSec: maxCachedEnd,
+    };
+
+    const response = await chrome.runtime.sendMessage<
+      StartCaptureMsg,
+      { success: boolean; error?: string }
+    >(msg);
+
+    if (!response?.success) {
+      throw new Error(response?.error || 'Offscreen capture failed to start');
+    }
+  } finally {
+    isStartingCapture = false;
   }
 }
 
 async function stopTabAudioCapture(): Promise<void> {
+  currentCaptureSession = null;
   if (!(await hasOffscreenDocument())) {
     return;
   }
@@ -420,6 +450,7 @@ function notifyTabStateChanged(tabId: number, active: boolean): void {
 }
 
 async function deactivateCurrentTab(): Promise<void> {
+  currentCaptureSession = null;
   const prevTabId = await getActiveTabId();
   await stopTabAudioCapture();
   await setActiveTabId(null);
@@ -463,6 +494,41 @@ chrome.runtime.onMessage.addListener(
           target: 'offscreen',
         })
         .catch(() => {});
+      return false;
+    }
+
+    if (message?.type === MSG.VIDEO_ATTACHED) {
+      void (async () => {
+        const activeTabId = await getActiveTabId();
+        const senderTabId = sender?.tab?.id;
+        if (!senderTabId || activeTabId !== senderTabId) {
+          return;
+        }
+
+        const videoMsg = message as VideoAttachedMsg;
+        const cleanUrl = normalizeVideoUrl(videoMsg.url || sender.tab?.url || '');
+        const duration = videoMsg.duration || 0;
+
+        if (
+          currentCaptureSession &&
+          currentCaptureSession.tabId === senderTabId &&
+          currentCaptureSession.url === cleanUrl &&
+          Math.round(currentCaptureSession.duration) === Math.round(duration) &&
+          duration > 0
+        ) {
+          return;
+        }
+
+        try {
+          await stopTabAudioCapture();
+          await startTabAudioCapture(senderTabId, {
+            url: cleanUrl,
+            duration,
+          });
+        } catch (err) {
+          console.warn('[Delos Background] Failed to start capture on video attached:', err);
+        }
+      })();
       return false;
     }
 
@@ -627,6 +693,7 @@ async function handleMessage(
   if (message.type === MSG.CAPTURE_STOPPED) {
     const activeTabId = await getActiveTabId();
     if (activeTabId === message.tabId) {
+      currentCaptureSession = null;
       await setActiveTabId(null);
       notifyTabStateChanged(message.tabId, false);
       try {
@@ -696,9 +763,21 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       return;
     }
 
+    if (changeInfo.status === 'loading') {
+      await stopTabAudioCapture();
+      return;
+    }
+
     if (changeInfo.url && isBlacklisted(changeInfo.url)) {
       await deactivateCurrentTab();
       return;
+    }
+
+    if (changeInfo.url && currentCaptureSession) {
+      const cleanUpdatedUrl = normalizeVideoUrl(changeInfo.url);
+      if (cleanUpdatedUrl !== currentCaptureSession.url) {
+        await stopTabAudioCapture();
+      }
     }
 
     if (changeInfo.status === 'complete' && tab.url && !isBlacklisted(tab.url)) {

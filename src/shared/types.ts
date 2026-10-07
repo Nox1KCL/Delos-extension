@@ -54,6 +54,12 @@ export interface TranslateWordResponse {
   error?: string;
 }
 
+export interface VideoAttachedMsg {
+  type: 'DELOS_VIDEO_ATTACHED';
+  url: string;
+  duration: number;
+}
+
 export type ToBackgroundMsg =
   | GetStatusMsg
   | ToggleMsg
@@ -62,7 +68,8 @@ export type ToBackgroundMsg =
   | SubtitleMsg
   | VideoTimeSyncMsg
   | SetWindowFullscreenMsg
-  | TranslateWordMsg;
+  | TranslateWordMsg
+  | VideoAttachedMsg;
 
 export interface StartCaptureMsg {
   type: 'OFFSCREEN_START_CAPTURE';

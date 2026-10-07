@@ -323,7 +323,6 @@ export class SubtitleOverlay {
 
   private handleFullscreenChange(): void {
     this.repositionOverlay();
-    // YouTube may rebuild DOM asynchronously after fullscreenchange
     setTimeout(() => this.repositionOverlay(), 100);
   }
 
@@ -334,8 +333,6 @@ export class SubtitleOverlay {
       (document as unknown as { webkitFullscreenElement?: Element }).webkitFullscreenElement) as HTMLElement | null;
 
     if (fullscreenEl) {
-      // Always reposition into the fullscreen element — stacking context
-      // changes on fullscreen entry and the overlay must sit above player layers
       const ytControls = fullscreenEl.querySelector('.ytp-chrome-bottom');
       if (ytControls && ytControls.parentElement === fullscreenEl) {
         fullscreenEl.insertBefore(this.hostEl, ytControls);
@@ -343,7 +340,6 @@ export class SubtitleOverlay {
         fullscreenEl.appendChild(this.hostEl);
       }
     } else {
-      // Exiting fullscreen — move back into the original player container
       const originalContainer = this.playerContainer || this.getBestPlayerContainer(this.activeVideo);
       if (originalContainer) {
         const ytControls = originalContainer.querySelector('.ytp-chrome-bottom');
@@ -446,8 +442,6 @@ export class SubtitleOverlay {
     const cleanText = text.trim();
     if (!cleanText) return;
 
-    // Do NOT advance or show completely new subtitles while video is paused,
-    // but allow finalizing the currently active in-flight speech segment
     if (this.activeVideo && this.activeVideo.paused) {
       if (!isFinal || !this.currentCue) {
         return;
@@ -455,7 +449,6 @@ export class SubtitleOverlay {
     }
 
     if (isFinal) {
-      // Final message: flush any pending interim immediately and commit definitive text
       if (this.interimDebounceTimer !== null) {
         clearTimeout(this.interimDebounceTimer);
         this.interimDebounceTimer = null;
@@ -467,10 +460,6 @@ export class SubtitleOverlay {
     }
   }
 
-  /**
-   * Micro-debounce (65ms) for interim hypothesis stability.
-   * Flattens acoustic flapping (e.g. "cat" -> "kidding") before it reaches the DOM.
-   */
   private scheduleInterim(text: string, startSec: number, endSec: number): void {
     this.pendingInterim = { text, startSec, endSec };
 
@@ -488,14 +477,9 @@ export class SubtitleOverlay {
     }, 65);
   }
 
-  /**
-   * Interim result: Deepgram is streaming partial words in real-time.
-   * Update currBoxEl in-place so words appear fluidly without jumping.
-   */
   private handleInterim(text: string, startSec: number, endSec: number): void {
     if (!this.currBoxEl || !this.prevBoxEl) return;
 
-    // If previous cue was already committed (final received), promote it to prev line!
     if (this.isCurrentCommitted && this.currentCue && !this.currBoxEl.classList.contains('hidden')) {
       this.promoteToPrev();
     }
@@ -512,21 +496,15 @@ export class SubtitleOverlay {
     this.currentStartSec = startSec;
     this.currentEndSec = endSec;
 
-    // Update words via DOM-diffing in-place (no full innerHTML wipe)
     this.renderWords(text, this.currBoxEl, startSec, endSec);
     this.currBoxEl.classList.remove('hidden', 'delos-fading');
 
-    // Keep active while speech is streaming
     if (this.currHideTimer) {
       clearTimeout(this.currHideTimer);
       this.currHideTimer = null;
     }
   }
 
-  /**
-   * Final result: Deepgram has locked in this speech segment.
-   * Render definitive text, mark as committed, and schedule hide timer.
-   */
   private handleFinal(text: string, startSec: number, endSec: number): void {
     if (!this.currBoxEl || !this.prevBoxEl) return;
 
@@ -544,7 +522,6 @@ export class SubtitleOverlay {
     this.renderWords(text, this.currBoxEl, startSec, endSec);
     this.currBoxEl.classList.remove('hidden', 'delos-fading');
 
-    // Auto-hide when silence follows: minimum 2.6s, +280ms per word (up to 4.2s max)
     const words = text.split(/\s+/).filter(Boolean);
     const holdMs = Math.min(Math.max(2600, words.length * 280 + 400), 4200);
 
@@ -553,10 +530,6 @@ export class SubtitleOverlay {
     }
   }
 
-  /**
-   * Promote the current committed cue to the upper (prev) subtitle line.
-   * Transitions smoothly upwards into the upper slot while gently dimming.
-   */
   private promoteToPrev(): void {
     if (!this.prevBoxEl || !this.currentCue) return;
 
@@ -571,7 +544,6 @@ export class SubtitleOverlay {
     this.prevBoxEl.classList.remove('hidden', 'delos-fading');
     this.prevBoxEl.classList.add('delos-promoting');
 
-    // Remove promoting class on next frame to trigger CSS upward transition
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         this.prevBoxEl?.classList.remove('delos-promoting');
@@ -638,18 +610,12 @@ export class SubtitleOverlay {
     }, 220);
   }
 
-  /**
-   * Smart DOM diffing: updates or appends words without destroying already rendered elements.
-   * Newly appended words animate smoothly, while existing words stay rock-solid in DOM.
-   */
   private renderWords(sentence: string, container: HTMLElement, startSec = 0, endSec = 0): void {
     const tokens = sentence.split(/\s+/).filter(Boolean);
     const existingSpans = Array.from(container.querySelectorAll<HTMLElement>('.delos-sub-word'));
 
-    // Split multi-sentence cue into per-token individual sentences
     const tokenSentences = this.mapTokensToSentences(tokens);
 
-    // 1. Update matching prefix spans or reuse them without re-creating DOM nodes
     const minLen = Math.min(tokens.length, existingSpans.length);
     for (let i = 0; i < minLen; i++) {
       const token = tokens[i];
@@ -664,7 +630,6 @@ export class SubtitleOverlay {
       span.dataset.end = String(endSec);
     }
 
-    // 2. If tokens shrank, remove excess spans and their space text nodes
     if (existingSpans.length > tokens.length) {
       for (let i = tokens.length; i < existingSpans.length; i++) {
         const span = existingSpans[i];
@@ -675,7 +640,6 @@ export class SubtitleOverlay {
       }
     }
 
-    // 3. If tokens grew, append new spans with entrance animation
     if (tokens.length > existingSpans.length) {
       for (let i = existingSpans.length; i < tokens.length; i++) {
         const token = tokens[i];
@@ -762,7 +726,6 @@ export class SubtitleOverlay {
       return;
     }
 
-    // Show popup immediately with loading indicator
     this.popupController.show(
       {
         word: targetWord,
